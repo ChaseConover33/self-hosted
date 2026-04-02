@@ -1,0 +1,9 @@
+[Unit]
+Description=Run local self-hosted backup schedule
+
+[Timer]
+OnCalendar={{ platform_backup_schedule }}
+Persistent=true
+
+[Install]
+WantedBy=timers.target

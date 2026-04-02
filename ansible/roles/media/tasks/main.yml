@@ -1,0 +1,8 @@
+---
+- name: Install media ingest script
+  ansible.builtin.template:
+    src: self-hosted-ingest-media.sh.j2
+    dest: /usr/local/bin/self-hosted-ingest-media
+    owner: root
+    group: root
+    mode: "0755"

@@ -1,0 +1,61 @@
+---
+- name: Recover homelab after crash or reboot
+  hosts: homelab
+  become: true
+  tasks:
+    - name: Mount all drives from fstab
+      ansible.builtin.command: mount -a
+      changed_when: false
+
+    - name: Verify external drives are mounted
+      ansible.builtin.command: mountpoint -q {{ item.mount }}
+      loop: "{{ platform_external_drives | default([]) }}"
+      loop_control:
+        label: "{{ item.mount }} ({{ item.label }})"
+      register: mount_check
+      failed_when: false
+      changed_when: false
+
+    - name: Report drive mount status
+      ansible.builtin.debug:
+        msg: "{{ item.item.mount }} ({{ item.item.label }}): {{ 'mounted' if item.rc == 0 else 'NOT MOUNTED' }}"
+      loop: "{{ mount_check.results }}"
+      loop_control:
+        label: "{{ item.item.mount }}"
+
+    - name: Fail if required drives are not mounted
+      ansible.builtin.assert:
+        that:
+          - item.rc == 0
+        fail_msg: "Drive {{ item.item.label }} is not mounted at {{ item.item.mount }} — check USB connection"
+      loop: "{{ mount_check.results }}"
+      loop_control:
+        label: "{{ item.item.mount }}"
+
+    - name: Restart homelab compose stack
+      ansible.builtin.systemd:
+        name: homelab-compose
+        state: restarted
+
+    - name: Wait for containers to stabilize
+      ansible.builtin.pause:
+        seconds: 15
+
+    - name: Check container health
+      ansible.builtin.shell: >-
+        docker ps --format '{{ '{{' }}.Names{{ '}}' }}\t{{ '{{' }}.Status{{ '}}' }}'
+      register: container_status
+      changed_when: false
+
+    - name: Show container status
+      ansible.builtin.debug:
+        msg: "{{ container_status.stdout }}"
+
+    - name: Count running containers
+      ansible.builtin.shell: docker ps --format json | wc -l
+      register: running_count
+      changed_when: false
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg: "{{ running_count.stdout | trim }} containers running"

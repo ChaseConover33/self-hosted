@@ -1,0 +1,17 @@
+services:
+  qbittorrent:
+    image: linuxserver/qbittorrent:latest
+    restart: unless-stopped
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: America/Denver
+      WEBUI_PORT: "8080"
+    volumes:
+      - ${PLATFORM_CONFIG_ROOT}/qbittorrent:/config
+      - ${PLATFORM_UPLOAD_ROOT}/incoming:/downloads
+    ports:
+      - "6881:6881"
+      - "6881:6881/udp"
+    networks:
+      - internal

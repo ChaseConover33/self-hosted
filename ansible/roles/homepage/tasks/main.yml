@@ -1,0 +1,32 @@
+---
+- name: Ensure homepage config directory exists
+  ansible.builtin.file:
+    path: "{{ platform_config_root }}/homepage"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Render homepage settings
+  ansible.builtin.template:
+    src: settings.yaml.j2
+    dest: "{{ platform_config_root }}/homepage/settings.yaml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Render homepage services
+  ansible.builtin.template:
+    src: services.yaml.j2
+    dest: "{{ platform_config_root }}/homepage/services.yaml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Render homepage widgets
+  ansible.builtin.template:
+    src: widgets.yaml.j2
+    dest: "{{ platform_config_root }}/homepage/widgets.yaml"
+    owner: root
+    group: root
+    mode: "0644"

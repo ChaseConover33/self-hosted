@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+upload_root="{{ platform_upload_root }}/incoming"
+media_root="{{ platform_media_root }}"
+
+ingest_category() {
+  local category="$1"
+  local source_dir="${upload_root}/${category}"
+  local target_dir="${media_root}/${category}"
+
+  mkdir -p "${source_dir}" "${target_dir}"
+
+  if ! find "${source_dir}" -mindepth 1 -print -quit >/dev/null 2>&1; then
+    echo "No new ${category} media to ingest."
+    return
+  fi
+
+  echo "Ingesting ${category} from ${source_dir} -> ${target_dir}"
+  rsync -a --remove-source-files "${source_dir}/" "${target_dir}/"
+  find "${source_dir}" -mindepth 1 -depth -type d -empty -delete
+}
+
+ingest_category movies
+ingest_category shows
+ingest_category music
+
+echo "Media ingest complete."

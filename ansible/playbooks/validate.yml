@@ -1,0 +1,28 @@
+---
+- name: Validate homelab configuration
+  hosts: homelab
+  gather_facts: true
+  tasks:
+    - name: Validate LAN CIDR mode or override value
+      ansible.builtin.assert:
+        that:
+          - platform_lan_cidr == 'auto' or platform_lan_cidr is match("^[0-9]{1,3}(\\.[0-9]{1,3}){3}/[0-9]{1,2}$")
+        fail_msg: "Set platform_lan_cidr to 'auto' or a CIDR like 192.168.1.0/24."
+
+    - name: Validate effective LAN CIDR can be computed
+      ansible.builtin.assert:
+        that:
+          - platform_effective_lan_cidr is match("^[0-9]{1,3}(\\.[0-9]{1,3}){3}/[0-9]{1,2}$")
+        fail_msg: "Unable to compute platform_effective_lan_cidr from ansible_default_ipv4 facts."
+
+    - name: Validate at least one service is enabled
+      ansible.builtin.assert:
+        that:
+          - platform_enabled_service_names | length > 0
+        fail_msg: "Enable at least one service in platform_services."
+
+    - name: Validate managed admin user has SSH keys when enabled
+      ansible.builtin.assert:
+        that:
+          - not platform_manage_admin_user or (platform_admin_authorized_keys | length > 0)
+        fail_msg: "Set platform_admin_authorized_keys before enabling platform_manage_admin_user."

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+container_name="homelab-synapse-1"
+
+if [[ $# -lt 1 ]]; then
+  echo "usage: $0 <username> [--admin]" >&2
+  exit 1
+fi
+
+username="$1"
+admin_flag="${2:-}"
+
+args=(
+  register_new_matrix_user
+  -c /config/homeserver.yaml
+  http://localhost:8008
+  -u "${username}"
+)
+
+if [[ "${admin_flag}" == "--admin" ]]; then
+  args+=(--admin)
+fi
+
+docker exec -it "${container_name}" "${args[@]}"

@@ -1,0 +1,12 @@
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    restart: unless-stopped
+    environment:
+      JELLYFIN_PublishedServerUrl: https://media.lab.chaseconover.com
+    volumes:
+      - ${PLATFORM_CONFIG_ROOT}/jellyfin/config:/config
+      - ${PLATFORM_DATA_ROOT}/jellyfin/cache:/cache
+      - ${PLATFORM_MEDIA_ROOT}:/media:ro
+    networks:
+      - internal

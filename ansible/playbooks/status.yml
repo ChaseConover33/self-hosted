@@ -1,0 +1,49 @@
+---
+- name: Check homelab service status
+  hosts: homelab
+  become: true
+  vars:
+    platform_repo_root: "{{ playbook_dir | dirname | dirname }}"
+  tasks:
+    - name: Build enabled compose file list
+      ansible.builtin.set_fact:
+        platform_compose_files: "{{ ['base/compose.yml'] + enabled_fragments }}"
+      vars:
+        enabled_fragments: >-
+          {{
+            platform_services
+            | dict2items
+            | selectattr('value.enabled')
+            | map(attribute='value.compose_files')
+            | flatten
+            | unique
+            | list
+          }}
+
+    - name: Get container statuses
+      ansible.builtin.shell: >-
+        docker compose
+        --project-name {{ platform_stack_name }}
+        --env-file {{ platform_compose_root }}/.env
+        {% for compose_file in platform_compose_files %}
+        -f {{ platform_compose_root }}/{{ compose_file }}
+        {% endfor %}
+        ps --format json
+      register: compose_ps
+      changed_when: false
+
+    - name: Parse container statuses
+      ansible.builtin.set_fact:
+        container_statuses: "{{ compose_ps.stdout_lines | map('from_json') | list }}"
+
+    - name: Show container health
+      ansible.builtin.debug:
+        msg: "{{ item.Name }}: {{ item.State }} ({{ item.Status }})"
+      loop: "{{ container_statuses }}"
+      loop_control:
+        label: "{{ item.Name }}"
+
+    - name: Summary
+      ansible.builtin.debug:
+        msg: >-
+          {{ container_statuses | selectattr('State', 'equalto', 'running') | list | length }}/{{ container_statuses | length }} containers running

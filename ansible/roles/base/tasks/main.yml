@@ -1,0 +1,68 @@
+---
+- name: Install base packages
+  ansible.builtin.apt:
+    name: "{{ platform_base_packages }}"
+    state: present
+    update_cache: true
+
+- name: Set host timezone
+  community.general.timezone:
+    name: "{{ platform_timezone }}"
+
+- name: Ensure platform groups exist
+  ansible.builtin.group:
+    name: docker
+    state: present
+
+- name: Create homelab admin user when enabled
+  ansible.builtin.user:
+    name: "{{ platform_admin_user }}"
+    shell: /bin/bash
+    groups: "{{ platform_admin_groups }}"
+    append: true
+    create_home: true
+    state: present
+  when: platform_manage_admin_user
+
+- name: Install authorized keys for managed admin user
+  ansible.posix.authorized_key:
+    user: "{{ platform_admin_user }}"
+    state: present
+    key: "{{ item }}"
+  loop: "{{ platform_admin_authorized_keys }}"
+  when: platform_manage_admin_user
+
+- name: Configure external drive mounts in fstab
+  ansible.posix.mount:
+    path: "{{ item.mount }}"
+    src: "UUID={{ item.uuid }}"
+    fstype: "{{ item.fstype }}"
+    opts: defaults,nofail,x-systemd.device-timeout=30s
+    state: mounted
+  loop: "{{ platform_external_drives }}"
+  when: platform_external_drives is defined
+
+- name: Create platform directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ platform_install_root }}"
+    - "{{ platform_config_root }}"
+    - "{{ platform_data_root }}"
+    - "{{ platform_backup_root }}"
+    - "{{ platform_media_root }}"
+    - "{{ platform_compose_root }}"
+    - "{{ platform_secrets_root }}"
+
+- name: Create managed service directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode | default('0755') }}"
+  loop: "{{ platform_managed_directories }}"

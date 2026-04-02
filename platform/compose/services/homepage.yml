@@ -1,0 +1,11 @@
+services:
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    restart: unless-stopped
+    environment:
+      HOMEPAGE_ALLOWED_HOSTS: home.lab.chaseconover.com
+    volumes:
+      - ${PLATFORM_CONFIG_ROOT}/homepage:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - internal

@@ -1,0 +1,10 @@
+services:
+  kiwix:
+    image: ghcr.io/kiwix/kiwix-serve:latest
+    restart: unless-stopped
+    command:
+      - /data/*.zim
+    volumes:
+      - /mnt/disk1/archive/kiwix:/data:ro
+    networks:
+      - internal

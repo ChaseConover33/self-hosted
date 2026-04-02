@@ -1,0 +1,9 @@
+[Unit]
+Description=Run lightweight host health checks on schedule
+
+[Timer]
+OnCalendar={{ platform_monitoring_schedule }}
+Persistent=true
+
+[Install]
+WantedBy=timers.target

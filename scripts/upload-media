@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+inventory_file="${repo_root}/ansible/inventory/production/hosts.yml"
+
+category="${1:-}"
+source_path="${2:-}"
+
+if [[ -z "${category}" || -z "${source_path}" ]]; then
+  echo "usage: $0 <movies|shows|music> <local-path>" >&2
+  exit 1
+fi
+
+case "${category}" in
+  movies|shows|music)
+    ;;
+  *)
+    echo "category must be one of: movies, shows, music" >&2
+    exit 1
+    ;;
+esac
+
+if [[ ! -e "${source_path}" ]]; then
+  echo "local path does not exist: ${source_path}" >&2
+  exit 1
+fi
+
+host="$(ruby -e 'require "yaml"; data = YAML.load_file(ARGV[0]); host = data["all"]["children"]["homelab"]["hosts"].keys.first; details = data["all"]["children"]["homelab"]["hosts"][host]; print "#{details["ansible_user"]}@#{details["ansible_host"]}"' "${inventory_file}")"
+remote_upload_path="/srv/self-hosted/uploads/incoming/${category}/"
+
+rsync -av --progress "${source_path}" "${host}:${remote_upload_path}"
+ssh "${host}" "sudo /usr/local/bin/self-hosted-ingest-media"

@@ -1,0 +1,22 @@
+---
+{% set icon_map = {
+  'uptime_kuma': 'uptime-kuma',
+  'jellyfin': 'jellyfin',
+  'synapse': 'matrix',
+  'vaultwarden': 'vaultwarden',
+  'syncthing': 'syncthing',
+  'navidrome': 'navidrome'
+} %}
+- Services:
+{% for service_item in platform_services | dict2items | selectattr('value.enabled') | selectattr('value.proxy_hosts', 'defined') | list %}
+{% set key = service_item.key %}
+{% set service = service_item.value %}
+{% if key != 'homepage' and key != 'demo_public' and key != 'demo_internal' %}
+    - {{ key | replace('_', ' ') | title }}:
+        href: "http://{{ service.proxy_hosts[0] }}"
+        description: "{{ service.description }}"
+{% if key in icon_map %}
+        icon: "{{ icon_map[key] }}.png"
+{% endif %}
+{% endif %}
+{% endfor %}

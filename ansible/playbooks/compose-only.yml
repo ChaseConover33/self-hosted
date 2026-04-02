@@ -1,0 +1,8 @@
+---
+- name: Deploy compose stack changes only
+  hosts: homelab
+  become: true
+  vars:
+    platform_repo_root: "{{ playbook_dir | dirname | dirname }}"
+  roles:
+    - role: compose

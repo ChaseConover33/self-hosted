@@ -1,0 +1,7 @@
+# Enable split horizon DNS for Tailscale remote access
+# Returns the IP matching the query's source subnet (LAN vs Tailscale)
+localise-queries
+
+# Never forward queries for the homelab domain upstream
+# Pi-hole answers these entirely from local address= records
+local=/{{ platform_domain_suffix }}/

@@ -1,0 +1,12 @@
+[Unit]
+Description=Watch for external drive mount and restart Homelab containers
+# Watches for a sentinel file that only exists when the HDD is mounted.
+# When the file appears, the corresponding .service unit runs and restarts containers.
+
+[Path]
+# The base role creates this directory on the HDD. If the drive isn't mounted,
+# this path doesn't exist, so the trigger won't fire.
+PathExists=/mnt/disk1/homelab/data
+
+[Install]
+WantedBy=multi-user.target

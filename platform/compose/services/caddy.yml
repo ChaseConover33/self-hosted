@@ -1,0 +1,24 @@
+services:
+  caddy:
+    build:
+      context: ${PLATFORM_COMPOSE_ROOT}/caddy
+      dockerfile: Dockerfile
+    image: homelab-caddy:latest
+    command:
+      - caddy
+      - run
+      - --config
+      - /etc/caddy/config.json
+    restart: unless-stopped
+    env_file:
+      - ${PLATFORM_SECRETS_ROOT}/caddy.env
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ${PLATFORM_CONFIG_ROOT}/caddy/config.json:/etc/caddy/config.json:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - public
+      - internal

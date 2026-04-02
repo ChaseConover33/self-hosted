@@ -1,0 +1,168 @@
+---
+- name: Ensure compose directory exists
+  ansible.builtin.file:
+    path: "{{ platform_compose_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Copy compose definitions to host
+  ansible.builtin.copy:
+    src: "{{ platform_repo_root }}/platform/compose/"
+    dest: "{{ platform_compose_root }}/"
+    owner: root
+    group: root
+    mode: preserve
+
+- name: Render compose environment file
+  ansible.builtin.template:
+    src: platform.env.j2
+    dest: "{{ platform_compose_root }}/.env"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Build enabled compose file list
+  ansible.builtin.set_fact:
+    platform_compose_files: "{{ ['base/compose.yml'] + enabled_fragments }}"
+  vars:
+    enabled_fragments: >-
+      {{
+        platform_services
+        | dict2items
+        | selectattr('value.enabled')
+        | map(attribute='value.compose_files')
+        | flatten
+        | unique
+        | list
+      }}
+
+- name: Collect required secret files for enabled services
+  ansible.builtin.set_fact:
+    platform_required_secret_files: "{{ required_secret_files }}"
+  vars:
+    required_secret_files: >-
+      {{
+        platform_services
+        | dict2items
+        | selectattr('value.enabled')
+        | selectattr('value.required_secret_files', 'defined')
+        | map(attribute='value.required_secret_files')
+        | flatten
+        | unique
+        | list
+      }}
+
+- name: Check required secret files for enabled services
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop: "{{ platform_required_secret_files }}"
+  register: platform_secret_file_stats
+  when: platform_required_secret_files | length > 0
+
+- name: Fail when required secret files are missing
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+    fail_msg: "Missing required secret file for enabled service: {{ item.item }}"
+  loop: "{{ platform_secret_file_stats.results | default([]) }}"
+  when: platform_required_secret_files | length > 0
+
+- name: Validate rendered compose stack
+  ansible.builtin.shell: >-
+    docker compose
+    --project-name {{ platform_stack_name }}
+    --env-file {{ platform_compose_root }}/.env
+    {% for compose_file in platform_compose_files %}
+    -f {{ platform_compose_root }}/{{ compose_file }}
+    {% endfor %}
+    config -q
+  changed_when: false
+
+- name: Deploy compose stack
+  ansible.builtin.shell: >-
+    docker compose
+    --project-name {{ platform_stack_name }}
+    --env-file {{ platform_compose_root }}/.env
+    {% for compose_file in platform_compose_files %}
+    -f {{ platform_compose_root }}/{{ compose_file }}
+    {% endfor %}
+    up -d --remove-orphans
+  register: compose_up
+  changed_when: "'Started' in compose_up.stdout or 'Recreated' in compose_up.stdout or 'Creating' in compose_up.stdout"
+
+- name: Install compose stack systemd service
+  ansible.builtin.template:
+    src: homelab-compose.service.j2
+    dest: /etc/systemd/system/homelab-compose.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Enable compose stack systemd service
+  ansible.builtin.systemd:
+    name: homelab-compose
+    enabled: true
+    daemon_reload: true
+
+- name: Install drive-mount restart service
+  ansible.builtin.template:
+    src: homelab-compose-remount.service.j2
+    dest: /etc/systemd/system/homelab-compose-remount.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Install drive-mount watcher
+  ansible.builtin.template:
+    src: homelab-compose-remount.path.j2
+    dest: /etc/systemd/system/homelab-compose-remount.path
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Enable drive-mount watcher
+  ansible.builtin.systemd:
+    name: homelab-compose-remount.path
+    enabled: true
+    daemon_reload: true
+
+- name: Wait for containers to stabilize
+  ansible.builtin.pause:
+    seconds: 10
+
+- name: Check container health
+  ansible.builtin.shell: >-
+    docker compose
+    --project-name {{ platform_stack_name }}
+    --env-file {{ platform_compose_root }}/.env
+    {% for compose_file in platform_compose_files %}
+    -f {{ platform_compose_root }}/{{ compose_file }}
+    {% endfor %}
+    ps --format json
+  register: compose_ps
+  changed_when: false
+
+- name: Parse container statuses
+  ansible.builtin.set_fact:
+    container_statuses: "{{ compose_ps.stdout_lines | map('from_json') | list }}"
+
+- name: Report container health
+  ansible.builtin.debug:
+    msg: "{{ item.Name }}: {{ item.State }} ({{ item.Status }})"
+  loop: "{{ container_statuses }}"
+  loop_control:
+    label: "{{ item.Name }}"
+
+- name: Fail if any containers are not running
+  ansible.builtin.assert:
+    that:
+      - item.State == "running"
+    fail_msg: "Container {{ item.Name }} is {{ item.State }}: {{ item.Status }}"
+  loop: "{{ container_statuses }}"
+  loop_control:
+    label: "{{ item.Name }}"

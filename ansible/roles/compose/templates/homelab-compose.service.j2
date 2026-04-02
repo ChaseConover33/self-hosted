@@ -1,0 +1,37 @@
+[Unit]
+Description=Homelab Docker Compose Stack
+# Don't start until Docker is running AND external drives are mounted.
+# nofail in fstab prevents boot from hanging if a drive is missing, but
+# this service still waits for the mount units to complete (success or skip).
+Requires=docker.service
+After=docker.service local-fs.target network-online.target
+Wants=network-online.target
+{% for drive in platform_external_drives | default([]) %}
+After={{ drive.mount[1:] | replace('/', '-') }}.mount
+Wants={{ drive.mount[1:] | replace('/', '-') }}.mount
+{% endfor %}
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+# Build the full compose command from whatever services are currently enabled.
+# Ansible regenerates this file every deploy, so it always reflects the active stack.
+ExecStart=docker compose \
+  --project-name {{ platform_stack_name }} \
+  --env-file {{ platform_compose_root }}/.env \
+{% for compose_file in platform_compose_files %}
+  -f {{ platform_compose_root }}/{{ compose_file }} \
+{% endfor %}
+  up -d --remove-orphans
+
+ExecStop=docker compose \
+  --project-name {{ platform_stack_name }} \
+  --env-file {{ platform_compose_root }}/.env \
+{% for compose_file in platform_compose_files %}
+  -f {{ platform_compose_root }}/{{ compose_file }} \
+{% endfor %}
+  down
+
+[Install]
+WantedBy=multi-user.target

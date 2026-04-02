@@ -1,0 +1,35 @@
+services:
+  synapse-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - ${PLATFORM_SECRETS_ROOT}/synapse.env
+    volumes:
+      - ${PLATFORM_DATA_ROOT}/synapse/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+
+  synapse:
+    image: matrixdotorg/synapse:latest
+    restart: unless-stopped
+    env_file:
+      - ${PLATFORM_SECRETS_ROOT}/synapse.env
+    environment:
+      SYNAPSE_CONFIG_DIR: /config
+      SYNAPSE_CONFIG_PATH: /config/homeserver.yaml
+      SYNAPSE_DATA_DIR: /data
+    depends_on:
+      synapse-db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8008:8008"
+    volumes:
+      - ${PLATFORM_CONFIG_ROOT}/synapse:/config
+      - ${PLATFORM_DATA_ROOT}/synapse:/data
+    networks:
+      - internal

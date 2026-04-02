@@ -1,0 +1,43 @@
+server_name: "{{ platform_synapse_server_name }}"
+pid_file: /data/homeserver.pid
+public_baseurl: "{{ platform_synapse_public_baseurl }}"
+report_stats: false
+
+listeners:
+  - port: 8008
+    tls: false
+    type: http
+    x_forwarded: true
+    resources:
+      - names:
+          - client
+          - federation
+        compress: false
+
+database:
+  name: psycopg2
+  allow_unsafe_locale: true
+  args:
+    user: synapse
+    password: "{{ synapse_env_postgres_password }}"
+    database: synapse
+    host: synapse-db
+    port: 5432
+    cp_min: 2
+    cp_max: 5
+
+media_store_path: /data/media-store
+signing_key_path: "/config/{{ platform_synapse_server_name }}.signing.key"
+trusted_key_servers:
+  - server_name: "matrix.org"
+
+enable_registration: false
+registration_shared_secret: "{{ synapse_env_registration_shared_secret }}"
+enable_registration_without_verification: false
+
+macaroon_secret_key: "{{ synapse_env_macaroon_secret_key }}"
+form_secret: "{{ synapse_env_form_secret }}"
+
+allow_public_rooms_without_auth: false
+allow_public_rooms_over_federation: false
+suppress_key_server_warning: true

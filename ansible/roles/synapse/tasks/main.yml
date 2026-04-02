@@ -1,0 +1,126 @@
+---
+- name: Check whether Synapse secret file exists
+  ansible.builtin.stat:
+    path: "{{ platform_secrets_root }}/synapse.env"
+  register: synapse_secret_file
+  when:
+    - platform_services.synapse is defined
+    - platform_services.synapse.enabled
+
+- name: Generate Synapse secrets when secret file is missing
+  ansible.builtin.set_fact:
+    synapse_postgres_password: "{{ lookup('ansible.builtin.password', '/dev/null', chars=['ascii_letters', 'digits'], length=32) }}"
+    synapse_registration_shared_secret: "{{ lookup('ansible.builtin.password', '/dev/null', chars=['ascii_letters', 'digits'], length=48) }}"
+    synapse_macaroon_secret_key: "{{ lookup('ansible.builtin.password', '/dev/null', chars=['ascii_letters', 'digits'], length=48) }}"
+    synapse_form_secret: "{{ lookup('ansible.builtin.password', '/dev/null', chars=['ascii_letters', 'digits'], length=48) }}"
+  when:
+    - platform_services.synapse is defined
+    - platform_services.synapse.enabled
+    - not synapse_secret_file.stat.exists
+
+- name: Create Synapse secret file automatically when missing
+  ansible.builtin.template:
+    src: synapse.env.j2
+    dest: "{{ platform_secrets_root }}/synapse.env"
+    owner: root
+    group: root
+    mode: "0600"
+  when:
+    - platform_services.synapse is defined
+    - platform_services.synapse.enabled
+    - not synapse_secret_file.stat.exists
+
+- name: Read Synapse secret file
+  ansible.builtin.slurp:
+    path: "{{ platform_secrets_root }}/synapse.env"
+  register: synapse_secret_contents
+  when:
+    - platform_services.synapse is defined
+    - platform_services.synapse.enabled
+
+- name: Parse Synapse secret values
+  ansible.builtin.set_fact:
+    synapse_secret_text: "{{ synapse_secret_contents.content | b64decode }}"
+    synapse_env_postgres_password: "{{ (synapse_secret_contents.content | b64decode) | regex_search('(?m)^SYNAPSE_POSTGRES_PASSWORD=(.+)$', '\\1') | first }}"
+    synapse_env_registration_shared_secret: "{{ (synapse_secret_contents.content | b64decode) | regex_search('(?m)^SYNAPSE_REGISTRATION_SHARED_SECRET=(.+)$', '\\1') | first }}"
+    synapse_env_macaroon_secret_key: "{{ (synapse_secret_contents.content | b64decode) | regex_search('(?m)^SYNAPSE_MACAROON_SECRET_KEY=(.+)$', '\\1') | first }}"
+    synapse_env_form_secret: "{{ (synapse_secret_contents.content | b64decode) | regex_search('(?m)^SYNAPSE_FORM_SECRET=(.+)$', '\\1') | first }}"
+  when:
+    - platform_services.synapse is defined
+    - platform_services.synapse.enabled
+
+- name: Ensure Synapse secret file includes Postgres compatibility variables
+  ansible.builtin.lineinfile:
+    path: "{{ platform_secrets_root }}/synapse.env"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    owner: root
+    group: root
+    mode: "0600"
+  loop:
+    - regexp: '^POSTGRES_DB='
+      line: 'POSTGRES_DB=synapse'
+    - regexp: '^POSTGRES_USER='
+      line: 'POSTGRES_USER=synapse'
+    - regexp: '^POSTGRES_PASSWORD='
+      line: "POSTGRES_PASSWORD={{ synapse_env_postgres_password }}"
+  when:
+    - platform_services.synapse is defined
+    - platform_services.synapse.enabled
+
+- name: Check whether Synapse signing key exists
+  ansible.builtin.stat:
+    path: "{{ platform_config_root }}/synapse/{{ platform_synapse_server_name }}.signing.key"
+  register: synapse_signing_key
+  when:
+    - platform_services.synapse is defined
+    - platform_services.synapse.enabled
+
+- name: Generate baseline Synapse config and signing key when missing
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - -e
+      - "SYNAPSE_CONFIG_DIR=/config"
+      - -e
+      - "SYNAPSE_CONFIG_PATH=/config/homeserver.yaml"
+      - -e
+      - "SYNAPSE_DATA_DIR=/data"
+      - -e
+      - "SYNAPSE_SERVER_NAME={{ platform_synapse_server_name }}"
+      - -e
+      - "SYNAPSE_REPORT_STATS=no"
+      - -v
+      - "{{ platform_config_root }}/synapse:/config"
+      - -v
+      - "{{ platform_data_root }}/synapse:/data"
+      - matrixdotorg/synapse:latest
+      - generate
+  when:
+    - platform_services.synapse is defined
+    - platform_services.synapse.enabled
+    - not synapse_signing_key.stat.exists
+
+- name: Render Synapse homeserver config
+  ansible.builtin.template:
+    src: homeserver.yaml.j2
+    dest: "{{ platform_config_root }}/synapse/homeserver.yaml"
+    owner: "991"
+    group: "991"
+    mode: "0640"
+  when:
+    - platform_services.synapse is defined
+    - platform_services.synapse.enabled
+
+- name: Install Synapse admin registration helper
+  ansible.builtin.template:
+    src: self-hosted-register-synapse-user.sh.j2
+    dest: /usr/local/bin/self-hosted-register-synapse-user
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - platform_services.synapse is defined
+    - platform_services.synapse.enabled

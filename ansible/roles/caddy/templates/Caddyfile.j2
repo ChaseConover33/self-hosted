@@ -1,0 +1,119 @@
+{
+  "admin": {
+    "disabled": true
+  },
+  "apps": {
+    "tls": {
+      "automation": {
+        "policies": [
+          {
+            "subjects": [
+              "*.{{ platform_domain_suffix }}"
+            ],
+            "issuers": [
+              {
+                "module": "acme",
+                "challenges": {
+                  "dns": {
+                    "provider": {
+                      "name": "route53",
+                      "max_retries": 10
+                    },
+                    "propagation_delay": "60s",
+                    "propagation_timeout": "300s"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "http": {
+      "servers": {
+        "lan": {
+          "listen": [
+            ":443"
+          ],
+          "routes": [
+{% set enabled_proxy_services = platform_services | dict2items | selectattr('value.enabled') | selectattr('value.proxy_hosts', 'defined') | selectattr('value.upstream', 'defined') | list %}
+{% for service_item in enabled_proxy_services %}
+{% set service_name = service_item.key %}
+{% set service = service_item.value %}
+{% for hostname in service.proxy_hosts %}
+            {
+              "match": [
+                {
+                  "host": [
+                    "{{ hostname }}"
+                  ]
+                }
+              ],
+              "handle": [
+                {
+                  "handler": "subroute",
+                  "routes": [
+                    {
+                      "handle": [
+                        {
+                          "handler": "encode",
+                          "encodings": {
+                            "gzip": {}
+                          },
+                          "prefer": [
+                            "gzip"
+                          ]
+                        },
+                        {
+                          "handler": "reverse_proxy",
+                          "upstreams": [
+                            {
+                              "dial": "{{ service.upstream }}"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "terminal": true
+            }{% if not (loop.last and service_item == enabled_proxy_services[-1]) %},{% endif %}
+{% endfor %}
+{% endfor %}
+{% if enabled_proxy_services | length > 0 %},{% endif %}
+            {
+              "handle": [
+                {
+                  "handler": "static_response",
+                  "status_code": 404,
+                  "body": "unknown homelab host"
+                }
+              ]
+            }
+          ]
+        },
+        "http_redirect": {
+          "listen": [
+            ":80"
+          ],
+          "routes": [
+            {
+              "handle": [
+                {
+                  "handler": "static_response",
+                  "status_code": 301,
+                  "headers": {
+                    "Location": [
+                      "https://{http.request.host}{http.request.uri}"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,53 @@
+---
+- name: Check whether Pi-hole secret file exists
+  ansible.builtin.stat:
+    path: "{{ platform_secrets_root }}/pihole.env"
+  register: pihole_secret_file
+  when:
+    - platform_services.pihole is defined
+    - platform_services.pihole.enabled
+
+- name: Generate Pi-hole web password when secret file is missing
+  ansible.builtin.set_fact:
+    pihole_web_password: "{{ lookup('ansible.builtin.password', '/dev/null', chars=['ascii_letters', 'digits'], length=32) }}"
+  when:
+    - platform_services.pihole is defined
+    - platform_services.pihole.enabled
+    - not pihole_secret_file.stat.exists
+
+- name: Create Pi-hole secret file when missing
+  ansible.builtin.template:
+    src: pihole.env.j2
+    dest: "{{ platform_secrets_root }}/pihole.env"
+    owner: root
+    group: root
+    mode: "0600"
+  when:
+    - platform_services.pihole is defined
+    - platform_services.pihole.enabled
+    - not pihole_secret_file.stat.exists
+
+- name: Render Tailscale split horizon dnsmasq config
+  ansible.builtin.template:
+    src: 01-tailscale.conf.j2
+    dest: "{{ platform_config_root }}/pihole/etc-dnsmasq/01-tailscale.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  when:
+    - platform_services.pihole is defined
+    - platform_services.pihole.enabled
+    - platform_tailscale_ip is defined
+  notify: Restart pihole dns
+
+- name: Render Pi-hole custom DNS entries
+  ansible.builtin.template:
+    src: custom.list.j2
+    dest: "{{ platform_config_root }}/pihole/etc-dnsmasq/02-homelab.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  when:
+    - platform_services.pihole is defined
+    - platform_services.pihole.enabled
+  notify: Restart pihole dns

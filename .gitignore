@@ -1,0 +1,15 @@
+# Claude Code local state
+.claude/
+
+# Environment and secret files
+*.env
+!platform/env/*.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Terraform state (if used later)
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup

@@ -1,0 +1,17 @@
+services:
+  syncthing:
+    image: lscr.io/linuxserver/syncthing:latest
+    restart: unless-stopped
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: America/Denver
+    ports:
+      - "22000:22000/tcp"
+      - "22000:22000/udp"
+      - "21027:21027/udp"
+    volumes:
+      - ${PLATFORM_CONFIG_ROOT}/syncthing:/config
+      - ${PLATFORM_DATA_ROOT}/syncthing:/data
+    networks:
+      - internal

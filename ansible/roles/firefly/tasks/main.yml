@@ -1,0 +1,30 @@
+---
+- name: Check whether Firefly secret file exists
+  ansible.builtin.stat:
+    path: "{{ platform_secrets_root }}/firefly.env"
+  register: firefly_secret_file
+  when:
+    - platform_services.firefly is defined
+    - platform_services.firefly.enabled
+
+- name: Generate Firefly secrets when secret file is missing
+  ansible.builtin.set_fact:
+    firefly_app_key: "{{ lookup('ansible.builtin.password', '/dev/null', chars=['ascii_letters', 'digits'], length=32) }}"
+    firefly_cron_token: "{{ lookup('ansible.builtin.password', '/dev/null', chars=['ascii_letters', 'digits'], length=32) }}"
+    firefly_db_password: "{{ lookup('ansible.builtin.password', '/dev/null', chars=['ascii_letters', 'digits'], length=32) }}"
+  when:
+    - platform_services.firefly is defined
+    - platform_services.firefly.enabled
+    - not firefly_secret_file.stat.exists
+
+- name: Create Firefly secret file when missing
+  ansible.builtin.template:
+    src: firefly.env.j2
+    dest: "{{ platform_secrets_root }}/firefly.env"
+    owner: root
+    group: root
+    mode: "0600"
+  when:
+    - platform_services.firefly is defined
+    - platform_services.firefly.enabled
+    - not firefly_secret_file.stat.exists

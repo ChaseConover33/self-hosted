@@ -1,0 +1,13 @@
+services:
+  navidrome:
+    image: deluan/navidrome:latest
+    restart: unless-stopped
+    environment:
+      ND_BASEURL: ""
+      ND_LOGLEVEL: info
+      ND_SCANSCHEDULE: 1h
+    volumes:
+      - ${PLATFORM_DATA_ROOT}/navidrome/data:/data
+      - ${PLATFORM_MEDIA_ROOT}/music:/music:ro
+    networks:
+      - internal

@@ -1,0 +1,46 @@
+services:
+  gitea:
+    image: docker.gitea.com/gitea:latest
+    restart: unless-stopped
+    env_file:
+      - ${PLATFORM_SECRETS_ROOT}/gitea.env
+    environment:
+      USER_UID: "1000"
+      USER_GID: "1000"
+      GITEA__database__DB_TYPE: postgres
+      GITEA__database__HOST: gitea-db:5432
+      GITEA__database__NAME: gitea
+      GITEA__database__USER: gitea
+      GITEA__server__DOMAIN: git.lab.chaseconover.com
+      GITEA__server__ROOT_URL: https://git.lab.chaseconover.com/
+      GITEA__server__HTTP_PORT: "3000"
+      GITEA__server__SSH_DOMAIN: git.lab.chaseconover.com
+      GITEA__server__SSH_PORT: "2222"
+      GITEA__server__START_SSH_SERVER: "true"
+      GITEA__service__DISABLE_REGISTRATION: "false"
+      GITEA__service__REQUIRE_SIGNIN_VIEW: "false"
+    volumes:
+      - ${PLATFORM_DATA_ROOT}/gitea:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "2222:2222"
+    networks:
+      - internal
+    depends_on:
+      gitea-db:
+        condition: service_healthy
+
+  gitea-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - ${PLATFORM_SECRETS_ROOT}/gitea.env
+    volumes:
+      - ${PLATFORM_DATA_ROOT}/gitea/db:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U gitea"]
+      interval: 10s
+      start_period: 30s

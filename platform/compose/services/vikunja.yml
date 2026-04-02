@@ -1,0 +1,36 @@
+services:
+  vikunja:
+    image: vikunja/vikunja:latest
+    restart: unless-stopped
+    env_file:
+      - ${PLATFORM_SECRETS_ROOT}/vikunja.env
+    environment:
+      VIKUNJA_DATABASE_HOST: vikunja-db
+      VIKUNJA_DATABASE_TYPE: postgres
+      VIKUNJA_DATABASE_USER: vikunja
+      VIKUNJA_DATABASE_DATABASE: vikunja
+      VIKUNJA_SERVICE_FRONTENDURL: https://tasks.lab.chaseconover.com/
+      VIKUNJA_CORS_ENABLE: "false"
+      GOCACHE: /app/vikunja/cache
+    volumes:
+      - ${PLATFORM_DATA_ROOT}/vikunja:/app/vikunja/files
+      - ${PLATFORM_DATA_ROOT}/vikunja/cache:/app/vikunja/cache
+    networks:
+      - internal
+    depends_on:
+      vikunja-db:
+        condition: service_healthy
+
+  vikunja-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - ${PLATFORM_SECRETS_ROOT}/vikunja.env
+    volumes:
+      - ${PLATFORM_DATA_ROOT}/vikunja/db:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U vikunja"]
+      interval: 10s
+      start_period: 30s

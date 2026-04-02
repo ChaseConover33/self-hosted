@@ -1,0 +1,9 @@
+services:
+  demo-internal:
+    image: hashicorp/http-echo:1.0.0
+    command:
+      - -listen=:5678
+      - -text=internal service healthy
+    restart: unless-stopped
+    networks:
+      - internal

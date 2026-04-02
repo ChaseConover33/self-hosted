@@ -1,0 +1,22 @@
+---
+- name: Bootstrap private homelab host
+  hosts: homelab
+  become: true
+  vars:
+    platform_repo_root: "{{ playbook_dir | dirname | dirname }}"
+  roles:
+    - role: base
+    - role: docker
+    - role: firewall
+    - role: caddy
+    - role: synapse
+    - role: media
+    - role: tailscale
+    - role: monitoring
+    - role: backup
+    - role: homepage
+    - role: pihole
+    - role: vikunja
+    - role: firefly
+    - role: gitea
+    - role: compose

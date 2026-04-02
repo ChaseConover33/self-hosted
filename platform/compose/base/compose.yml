@@ -1,0 +1,11 @@
+services: {}
+
+networks:
+  public:
+    name: homelab-public
+  internal:
+    name: homelab-internal
+
+volumes:
+  caddy_data:
+  caddy_config:

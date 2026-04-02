@@ -1,0 +1,349 @@
+platform_stack_name: homelab
+platform_timezone: America/Denver
+platform_domain_suffix: lab.chaseconover.com
+platform_lan_cidr: auto
+platform_effective_lan_cidr: >-
+  {{
+    platform_lan_cidr
+    if platform_lan_cidr != 'auto'
+    else ansible_default_ipv4.network ~ '/' ~ ansible_default_ipv4.prefix
+  }}
+
+platform_external_drives:
+  - uuid: "0d80e768-b1b9-474d-88d5-8f65054159a2"
+    mount: /mnt/disk1
+    fstype: ext4
+    label: MEDIA-01
+  - uuid: "e9979d9c-f118-4f15-b7a2-e6c9b8c8acf1"
+    mount: /mnt/disk2
+    fstype: ext4
+    label: MEDIA-02
+
+# Boot-critical paths — on the SD card so the platform starts without external drives.
+# Compose files, service configs, and secrets live here.
+platform_install_root: /srv/self-hosted
+platform_config_root: "{{ platform_install_root }}/config"
+platform_compose_root: "{{ platform_install_root }}/compose"
+platform_secrets_root: /etc/self-hosted
+
+# Data paths — on the external HDD. Services start without these but may be
+# unhealthy until the drive mounts. Large/expendable data belongs here.
+platform_data_root: /mnt/disk1/homelab/data
+platform_backup_root: /mnt/disk1/homelab/backups
+platform_media_root: /mnt/disk1/media
+platform_upload_root: /mnt/disk1/homelab/uploads
+
+platform_upload_user: "{{ ansible_user }}"
+platform_upload_group: "{{ ansible_user }}"
+
+platform_manage_admin_user: false
+platform_admin_user: homelab
+platform_admin_groups:
+  - sudo
+platform_admin_authorized_keys: []
+
+platform_base_packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - git
+  - gnupg
+  - python3
+  - python3-apt
+  - rsync
+  - ufw
+  - unzip
+
+platform_firewall_allowed_tcp_ports:
+  - 22
+  - 80
+  - 443
+platform_firewall_extra_tcp_ports:
+  - 53
+  - 8080
+  - 8000
+  - 2222
+  - 6881
+platform_firewall_extra_udp_ports:
+  - 53
+  - 6881
+
+platform_backup_enabled: true
+platform_backup_retention_days: 7
+platform_backup_schedule: "*-*-* 03:15:00"
+platform_backup_paths:
+  - "{{ platform_config_root }}"
+  - "{{ platform_data_root }}"
+  - "{{ platform_compose_root }}"
+
+platform_managed_directories:
+  - path: "{{ platform_config_root }}/caddy"
+  - path: "{{ platform_data_root }}/uptime-kuma"
+  - path: "{{ platform_data_root }}/vikunja"
+    owner: "1000"
+    group: "1000"
+  - path: "{{ platform_data_root }}/vikunja/cache"
+    owner: "1000"
+    group: "1000"
+  - path: "{{ platform_data_root }}/vikunja/db"
+    owner: "70"
+    group: "70"
+  - path: "{{ platform_data_root }}/firefly"
+    owner: "33"
+    group: "33"
+  - path: "{{ platform_data_root }}/firefly/upload"
+    owner: "33"
+    group: "33"
+  - path: "{{ platform_data_root }}/firefly/db"
+    owner: "70"
+    group: "70"
+  - path: "{{ platform_config_root }}/homepage"
+  - path: "{{ platform_config_root }}/synapse"
+    owner: "991"
+    group: "991"
+  - path: "{{ platform_data_root }}/synapse"
+    owner: "991"
+    group: "991"
+  - path: "{{ platform_data_root }}/synapse/media-store"
+    owner: "991"
+    group: "991"
+  - path: "{{ platform_data_root }}/synapse/postgres"
+    owner: "70"
+    group: "70"
+  - path: "{{ platform_data_root }}/vaultwarden"
+  - path: "{{ platform_config_root }}/pihole/etc-pihole"
+  - path: "{{ platform_config_root }}/pihole/etc-dnsmasq"
+  - path: "{{ platform_config_root }}/syncthing"
+  - path: "{{ platform_data_root }}/syncthing"
+  - path: "{{ platform_data_root }}/navidrome/data"
+  - path: "{{ platform_config_root }}/jellyfin/config"
+  - path: "{{ platform_data_root }}/jellyfin/cache"
+  - path: "{{ platform_data_root }}/gitea"
+    owner: "1000"
+    group: "1000"
+  - path: "{{ platform_data_root }}/gitea/db"
+    owner: "70"
+    group: "70"
+  - path: "{{ platform_config_root }}/qbittorrent"
+  - path: "{{ platform_data_root }}/trader/logs"
+  - path: "{{ platform_upload_root }}"
+    owner: "{{ platform_upload_user }}"
+    group: "{{ platform_upload_group }}"
+  - path: "{{ platform_upload_root }}/incoming"
+    owner: "{{ platform_upload_user }}"
+    group: "{{ platform_upload_group }}"
+  - path: "{{ platform_upload_root }}/incoming/movies"
+    owner: "{{ platform_upload_user }}"
+    group: "{{ platform_upload_group }}"
+  - path: "{{ platform_upload_root }}/incoming/shows"
+    owner: "{{ platform_upload_user }}"
+    group: "{{ platform_upload_group }}"
+  - path: "{{ platform_upload_root }}/incoming/music"
+    owner: "{{ platform_upload_user }}"
+    group: "{{ platform_upload_group }}"
+  - path: "{{ platform_media_root }}/music"
+  - path: "{{ platform_media_root }}/movies"
+  - path: "{{ platform_media_root }}/shows"
+
+platform_monitoring_enabled: true
+platform_monitoring_schedule: "*-*-* *:00:00"
+platform_synapse_server_name: chat.lab.chaseconover.com
+platform_synapse_public_baseurl: "https://chat.lab.chaseconover.com/"
+
+platform_services:
+  caddy:
+    enabled: true
+    compose_files:
+      - services/caddy.yml
+    required_secret_files:
+      - "{{ platform_secrets_root }}/caddy.env"
+  synapse:
+    enabled: false
+    compose_files:
+      - services/synapse.yml
+    proxy_hosts:
+      - chat.lab.chaseconover.com
+    upstream: synapse:8008
+    description: Private Matrix homeserver for Element clients over LAN and Tailscale
+    tier: tier1
+    ram_profile: medium
+    backup: true
+    required_secret_files:
+      - "{{ platform_secrets_root }}/synapse.env"
+  uptime_kuma:
+    enabled: false
+    compose_files:
+      - services/uptime-kuma.yml
+    proxy_hosts:
+      - status.lab.chaseconover.com
+    upstream: uptime-kuma:3001
+    description: Lightweight service availability dashboard
+    tier: baseline
+    ram_profile: low
+    backup: true
+  homepage:
+    enabled: true
+    compose_files:
+      - services/homepage.yml
+    proxy_hosts:
+      - home.lab.chaseconover.com
+    upstream: homepage:3000
+    description: Homelab service dashboard
+    tier: baseline
+    ram_profile: low
+    backup: true
+  pihole:
+    enabled: true
+    compose_files:
+      - services/pihole.yml
+    description: Network-wide DNS ad blocker and local DNS resolver (admin UI at http://<host-ip>:8080)
+    tier: baseline
+    ram_profile: low
+    backup: true
+    required_secret_files:
+      - "{{ platform_secrets_root }}/pihole.env"
+  vikunja:
+    enabled: true
+    compose_files:
+      - services/vikunja.yml
+    proxy_hosts:
+      - tasks.lab.chaseconover.com
+    upstream: vikunja:3456
+    description: Task manager for todos, ideas, and projects
+    tier: tier1
+    ram_profile: low
+    backup: true
+    required_secret_files:
+      - "{{ platform_secrets_root }}/vikunja.env"
+  firefly:
+    enabled: true
+    compose_files:
+      - services/firefly.yml
+    proxy_hosts:
+      - finance.lab.chaseconover.com
+    upstream: firefly:8080
+    description: Personal finance tracker and budgeting
+    tier: tier1
+    ram_profile: medium
+    backup: true
+    required_secret_files:
+      - "{{ platform_secrets_root }}/firefly.env"
+  demo_public:
+    enabled: true
+    compose_files:
+      - services/demo-public.yml
+    proxy_hosts:
+      - demo.lab.chaseconover.com
+    upstream: demo-public:80
+    description: Sample LAN-routed service for validating Caddy
+    tier: bootstrap
+    ram_profile: low
+    backup: false
+  demo_internal:
+    enabled: true
+    compose_files:
+      - services/demo-internal.yml
+    description: Sample internal-only service for validating internal networking
+    tier: bootstrap
+    ram_profile: low
+    backup: false
+  vaultwarden:
+    enabled: false
+    compose_files:
+      - services/vaultwarden.yml
+    proxy_hosts:
+      - vault.lab.chaseconover.com
+    upstream: vaultwarden:80
+    description: Password manager for private LAN use
+    tier: tier1
+    ram_profile: low
+    backup: true
+  syncthing:
+    enabled: false
+    compose_files:
+      - services/syncthing.yml
+    proxy_hosts:
+      - sync.lab.chaseconover.com
+    upstream: syncthing:8384
+    description: Local file synchronization
+    tier: tier1
+    ram_profile: medium
+    backup: true
+  navidrome:
+    enabled: false
+    compose_files:
+      - services/navidrome.yml
+    proxy_hosts:
+      - music.lab.chaseconover.com
+    upstream: navidrome:4533
+    description: Lightweight self-hosted music server
+    tier: tier1
+    ram_profile: medium
+    backup: true
+  jellyfin:
+    enabled: true
+    compose_files:
+      - services/jellyfin.yml
+    proxy_hosts:
+      - media.lab.chaseconover.com
+    upstream: jellyfin:8096
+    description: Media server for direct-play focused LAN streaming
+    tier: tier2
+    ram_profile: medium
+    backup: true
+  kiwix:
+    enabled: true
+    compose_files:
+      - services/kiwix.yml
+    proxy_hosts:
+      - archive.lab.chaseconover.com
+    upstream: kiwix:8080
+    description: Offline knowledge archive browser (Wikipedia, Stack Overflow, books)
+    tier: tier1
+    ram_profile: low
+    backup: false
+  gitea:
+    enabled: true
+    compose_files:
+      - services/gitea.yml
+    proxy_hosts:
+      - git.lab.chaseconover.com
+    upstream: gitea:3000
+    description: Self-hosted Git server for collaborative development
+    tier: tier1
+    ram_profile: low
+    backup: true
+    required_secret_files:
+      - "{{ platform_secrets_root }}/gitea.env"
+  qbittorrent:
+    enabled: true
+    compose_files:
+      - services/qbittorrent.yml
+    proxy_hosts:
+      - torrents.lab.chaseconover.com
+    upstream: qbittorrent:8080
+    description: Torrent client with web UI for downloading media and books
+    tier: tier1
+    ram_profile: low
+    backup: true
+  trader:
+    enabled: false
+    compose_files:
+      - services/trader.yml
+    description: Algorithmic trading bot (Alpaca paper/live)
+    tier: tier1
+    ram_profile: low
+    backup: true
+    required_secret_files:
+      - "{{ platform_secrets_root }}/trader.env"
+
+platform_tailscale_helpers_enabled: true
+
+platform_enabled_service_names: >-
+  {{
+    platform_services
+    | dict2items
+    | selectattr('value.enabled')
+    | map(attribute='key')
+    | list
+  }}

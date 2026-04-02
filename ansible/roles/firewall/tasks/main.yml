@@ -1,0 +1,39 @@
+---
+- name: Install UFW package
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+
+- name: Show effective LAN CIDR used by the firewall
+  ansible.builtin.debug:
+    msg: "Allowing LAN traffic from {{ platform_effective_lan_cidr }}"
+
+- name: Set default deny incoming policy
+  community.general.ufw:
+    direction: incoming
+    policy: deny
+
+- name: Set default allow outgoing policy
+  community.general.ufw:
+    direction: outgoing
+    policy: allow
+
+- name: Allow required TCP ports from LAN
+  community.general.ufw:
+    rule: allow
+    proto: tcp
+    from_ip: "{{ platform_effective_lan_cidr }}"
+    port: "{{ item }}"
+  loop: "{{ platform_firewall_allowed_tcp_ports + platform_firewall_extra_tcp_ports }}"
+
+- name: Allow required UDP ports from LAN
+  community.general.ufw:
+    rule: allow
+    proto: udp
+    from_ip: "{{ platform_effective_lan_cidr }}"
+    port: "{{ item }}"
+  loop: "{{ platform_firewall_extra_udp_ports }}"
+
+- name: Enable firewall
+  community.general.ufw:
+    state: enabled

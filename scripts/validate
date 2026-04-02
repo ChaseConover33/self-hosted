@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ansible_dir="${repo_root}/ansible"
+
+command -v ansible-playbook >/dev/null 2>&1 || {
+  echo "ansible-playbook is required" >&2
+  exit 1
+}
+
+command -v ansible-inventory >/dev/null 2>&1 || {
+  echo "ansible-inventory is required" >&2
+  exit 1
+}
+
+cd "${ansible_dir}"
+ansible-playbook --syntax-check playbooks/bootstrap.yml
+ansible-playbook --syntax-check playbooks/deploy.yml
+ansible-playbook --syntax-check playbooks/validate.yml
+ansible-inventory --graph

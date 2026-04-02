@@ -1,0 +1,5 @@
+---
+- name: Restart pihole dns
+  ansible.builtin.shell: >-
+    docker restart {{ platform_stack_name }}-pihole-1
+  changed_when: true

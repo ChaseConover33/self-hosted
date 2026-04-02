@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+log_file="/var/log/self-hosted-health.log"
+timestamp="$(date --iso-8601=seconds)"
+disk_percent="$(df -h {{ platform_install_root }} | awk 'NR==2 {print $5}')"
+mem_line="$(free -h | awk 'NR==2 {print $3 \"/\" $2}')"
+docker_state="missing"
+
+if command -v docker >/dev/null 2>&1; then
+  docker_state="$(docker ps --format '{{"{{"}}.Names{{"}}"}}' | wc -l | tr -d ' ') containers"
+fi
+
+printf '[%s] disk=%s memory=%s docker=%s\n' "${timestamp}" "${disk_percent}" "${mem_line}" "${docker_state}" >> "${log_file}"

@@ -1,0 +1,31 @@
+---
+- name: Ensure Caddy config directory exists
+  ansible.builtin.file:
+    path: "{{ platform_config_root }}/caddy"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Check whether Caddy secret file exists
+  ansible.builtin.stat:
+    path: "{{ platform_secrets_root }}/caddy.env"
+  register: caddy_secret_file
+
+- name: Fail if Caddy secret file is missing
+  ansible.builtin.assert:
+    that:
+      - caddy_secret_file.stat.exists
+    fail_msg: >-
+      Missing {{ platform_secrets_root }}/caddy.env — create it with
+      AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_HOSTED_ZONE_ID, and AWS_REGION.
+      See docs/tls.md for details.
+
+- name: Render Caddy config
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: "{{ platform_config_root }}/caddy/config.json"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart caddy

@@ -1,0 +1,11 @@
+services:
+  vaultwarden:
+    image: vaultwarden/server:latest
+    restart: unless-stopped
+    environment:
+      SIGNUPS_ALLOWED: "false"
+      WEBSOCKET_ENABLED: "true"
+    volumes:
+      - ${PLATFORM_DATA_ROOT}/vaultwarden:/data
+    networks:
+      - internal

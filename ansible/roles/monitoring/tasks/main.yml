@@ -1,0 +1,39 @@
+---
+- name: Install host health check script
+  ansible.builtin.template:
+    src: host-healthcheck.sh.j2
+    dest: /usr/local/bin/self-hosted-healthcheck
+    owner: root
+    group: root
+    mode: "0755"
+  when: platform_monitoring_enabled
+
+- name: Install host health check service
+  ansible.builtin.template:
+    src: self-hosted-healthcheck.service.j2
+    dest: /etc/systemd/system/self-hosted-healthcheck.service
+    owner: root
+    group: root
+    mode: "0644"
+  when: platform_monitoring_enabled
+
+- name: Install host health check timer
+  ansible.builtin.template:
+    src: self-hosted-healthcheck.timer.j2
+    dest: /etc/systemd/system/self-hosted-healthcheck.timer
+    owner: root
+    group: root
+    mode: "0644"
+  when: platform_monitoring_enabled
+
+- name: Reload systemd after monitoring unit changes
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: platform_monitoring_enabled
+
+- name: Enable host health check timer
+  ansible.builtin.systemd:
+    name: self-hosted-healthcheck.timer
+    state: started
+    enabled: true
+  when: platform_monitoring_enabled

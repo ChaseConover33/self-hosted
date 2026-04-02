@@ -1,0 +1,17 @@
+services:
+  trader:
+    build:
+      # Path is relative to where compose files live on the Pi:
+      # {{ platform_install_root }}/compose/
+      # The trader source gets deployed here by Ansible alongside compose files.
+      context: ../trader
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ${PLATFORM_SECRETS_ROOT}/trader.env
+    environment:
+      TRADER_MODE: ${TRADER_MODE:-paper}
+    volumes:
+      - ${PLATFORM_DATA_ROOT}/trader/logs:/app/logs
+    networks:
+      - internal

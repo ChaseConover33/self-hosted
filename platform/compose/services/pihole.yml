@@ -1,0 +1,17 @@
+services:
+  pihole:
+    image: pihole/pihole:latest
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - ${PLATFORM_SECRETS_ROOT}/pihole.env
+    environment:
+      FTLCONF_dns_upstreams: 1.1.1.1;1.0.0.1
+      FTLCONF_dns_listeningMode: all
+      FTLCONF_misc_etc_dnsmasq_d: "true"
+      FTLCONF_webserver_port: 8080
+    volumes:
+      - ${PLATFORM_CONFIG_ROOT}/pihole/etc-pihole:/etc/pihole
+      - ${PLATFORM_CONFIG_ROOT}/pihole/etc-dnsmasq:/etc/dnsmasq.d
+    cap_add:
+      - NET_ADMIN

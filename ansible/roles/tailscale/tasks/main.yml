@@ -1,0 +1,57 @@
+---
+- name: Check whether Tailscale is already installed
+  ansible.builtin.command: dpkg -s tailscale
+  register: tailscale_installed
+  changed_when: false
+  failed_when: false
+
+- name: Install Tailscale package repository
+  when: tailscale_installed.rc != 0
+  block:
+    - name: Download Tailscale install script
+      ansible.builtin.get_url:
+        url: https://tailscale.com/install.sh
+        dest: /tmp/tailscale-install.sh
+        mode: "0755"
+
+    - name: Run Tailscale install script
+      ansible.builtin.command: /tmp/tailscale-install.sh
+      changed_when: true
+
+    - name: Remove Tailscale install script
+      ansible.builtin.file:
+        path: /tmp/tailscale-install.sh
+        state: absent
+
+- name: Enable and start Tailscale service
+  ansible.builtin.systemd:
+    name: tailscaled
+    enabled: true
+    state: started
+
+- name: Get Tailscale IPv4 address
+  ansible.builtin.command: tailscale ip -4
+  register: tailscale_ip_result
+  changed_when: false
+  failed_when: false
+
+- name: Set Tailscale IP fact
+  ansible.builtin.set_fact:
+    platform_tailscale_ip: "{{ tailscale_ip_result.stdout | trim }}"
+  when: tailscale_ip_result.rc == 0
+
+- name: Allow Tailscale UDP port through firewall
+  community.general.ufw:
+    rule: allow
+    proto: udp
+    port: "41641"
+    comment: Tailscale direct connections
+
+- name: Install Tailscale chat helper when enabled
+  ansible.builtin.template:
+    src: self-hosted-share-chat-tailnet.sh.j2
+    dest: /usr/local/bin/self-hosted-share-chat-tailnet
+    owner: root
+    group: root
+    mode: "0755"
+  when: platform_tailscale_helpers_enabled

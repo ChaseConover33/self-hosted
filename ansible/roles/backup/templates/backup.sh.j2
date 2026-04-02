@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+backup_root="{{ platform_backup_root }}"
+backup_sdcard="{{ platform_install_root }}/backups"
+backup_disk2="/mnt/disk2/backups"
+timestamp="$(date +%Y%m%d-%H%M%S)"
+archive="${backup_root}/self-hosted-${timestamp}.tar.gz"
+retention_days="{{ platform_backup_retention_days }}"
+backup_paths=(
+{% for path in platform_backup_paths %}
+  "{{ path }}"
+{% endfor %}
+)
+
+mkdir -p "${backup_root}"
+
+tar -czf "${archive}" \
+  --exclude="${backup_root}" \
+  --exclude="${backup_sdcard}" \
+  --exclude="${backup_disk2}" \
+  "${backup_paths[@]}"
+
+# Copy to SD card (protects against disk1 failure)
+mkdir -p "${backup_sdcard}"
+cp "${archive}" "${backup_sdcard}/"
+find "${backup_sdcard}" -maxdepth 1 -type f -name 'self-hosted-*.tar.gz' -mtime +"${retention_days}" -delete
+
+# Copy to disk2 if mounted (protects against SD card failure)
+if mountpoint -q /mnt/disk2; then
+  mkdir -p "${backup_disk2}"
+  cp "${archive}" "${backup_disk2}/"
+  find "${backup_disk2}" -maxdepth 1 -type f -name 'self-hosted-*.tar.gz' -mtime +"${retention_days}" -delete
+fi
+
+# Clean up old backups on primary
+find "${backup_root}" -maxdepth 1 -type f -name 'self-hosted-*.tar.gz' -mtime +"${retention_days}" -delete

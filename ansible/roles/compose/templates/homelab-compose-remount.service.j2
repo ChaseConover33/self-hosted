@@ -1,0 +1,17 @@
+[Unit]
+Description=Restart Homelab containers after external drive mount
+# Only runs after the compose stack is already up AND a drive mount event occurs.
+# This handles the case where containers started before the HDD was available —
+# a restart lets them pick up the now-mounted data directories.
+After=homelab-compose.service
+Requires=homelab-compose.service
+
+[Service]
+Type=oneshot
+ExecStart=docker compose \
+  --project-name {{ platform_stack_name }} \
+  --env-file {{ platform_compose_root }}/.env \
+{% for compose_file in platform_compose_files %}
+  -f {{ platform_compose_root }}/{{ compose_file }} \
+{% endfor %}
+  restart

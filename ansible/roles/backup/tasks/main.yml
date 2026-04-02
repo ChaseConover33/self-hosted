@@ -1,0 +1,39 @@
+---
+- name: Install backup script
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: /usr/local/bin/self-hosted-backup
+    owner: root
+    group: root
+    mode: "0755"
+  when: platform_backup_enabled
+
+- name: Install backup systemd service
+  ansible.builtin.template:
+    src: self-hosted-backup.service.j2
+    dest: /etc/systemd/system/self-hosted-backup.service
+    owner: root
+    group: root
+    mode: "0644"
+  when: platform_backup_enabled
+
+- name: Install backup systemd timer
+  ansible.builtin.template:
+    src: self-hosted-backup.timer.j2
+    dest: /etc/systemd/system/self-hosted-backup.timer
+    owner: root
+    group: root
+    mode: "0644"
+  when: platform_backup_enabled
+
+- name: Reload systemd after backup unit changes
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: platform_backup_enabled
+
+- name: Enable backup timer
+  ansible.builtin.systemd:
+    name: self-hosted-backup.timer
+    state: started
+    enabled: true
+  when: platform_backup_enabled

@@ -1,0 +1,6 @@
+services:
+  demo-public:
+    image: traefik/whoami:latest
+    restart: unless-stopped
+    networks:
+      - internal

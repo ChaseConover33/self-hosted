@@ -1,0 +1,29 @@
+---
+- name: Check whether Vikunja secret file exists
+  ansible.builtin.stat:
+    path: "{{ platform_secrets_root }}/vikunja.env"
+  register: vikunja_secret_file
+  when:
+    - platform_services.vikunja is defined
+    - platform_services.vikunja.enabled
+
+- name: Generate Vikunja secrets when secret file is missing
+  ansible.builtin.set_fact:
+    vikunja_db_password: "{{ lookup('ansible.builtin.password', '/dev/null', chars=['ascii_letters', 'digits'], length=32) }}"
+    vikunja_jwt_secret: "{{ lookup('ansible.builtin.password', '/dev/null', chars=['ascii_letters', 'digits'], length=48) }}"
+  when:
+    - platform_services.vikunja is defined
+    - platform_services.vikunja.enabled
+    - not vikunja_secret_file.stat.exists
+
+- name: Create Vikunja secret file when missing
+  ansible.builtin.template:
+    src: vikunja.env.j2
+    dest: "{{ platform_secrets_root }}/vikunja.env"
+    owner: root
+    group: root
+    mode: "0600"
+  when:
+    - platform_services.vikunja is defined
+    - platform_services.vikunja.enabled
+    - not vikunja_secret_file.stat.exists

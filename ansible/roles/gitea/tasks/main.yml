@@ -1,0 +1,30 @@
+---
+- name: Check whether Gitea secret file exists
+  ansible.builtin.stat:
+    path: "{{ platform_secrets_root }}/gitea.env"
+  register: gitea_secret_file
+  when:
+    - platform_services.gitea is defined
+    - platform_services.gitea.enabled
+
+- name: Generate Gitea secrets when secret file is missing
+  ansible.builtin.set_fact:
+    gitea_db_password: "{{ lookup('ansible.builtin.password', '/dev/null', chars=['ascii_letters', 'digits'], length=32) }}"
+    gitea_secret_key: "{{ lookup('ansible.builtin.password', '/dev/null', chars=['ascii_letters', 'digits'], length=48) }}"
+    gitea_internal_token: "{{ lookup('ansible.builtin.password', '/dev/null', chars=['ascii_letters', 'digits'], length=64) }}"
+  when:
+    - platform_services.gitea is defined
+    - platform_services.gitea.enabled
+    - not gitea_secret_file.stat.exists
+
+- name: Create Gitea secret file when missing
+  ansible.builtin.template:
+    src: gitea.env.j2
+    dest: "{{ platform_secrets_root }}/gitea.env"
+    owner: root
+    group: root
+    mode: "0600"
+  when:
+    - platform_services.gitea is defined
+    - platform_services.gitea.enabled
+    - not gitea_secret_file.stat.exists
