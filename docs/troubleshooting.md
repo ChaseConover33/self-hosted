@@ -8,10 +8,11 @@ Common issues and how to resolve them using the project's scripts.
 |---------|-------------|-----|
 | Services unreachable after reboot | Drives not mounted, containers not started | `./scripts/deploy recover` |
 | Services unreachable, Pi is up | Caddy or Pi-hole needs restart | `./scripts/deploy recover` |
+| Pi unreachable overnight, SSH hangs | WiFi degraded by Docker veth churn | See [WiFi Degradation](#wifi-degradation-services-unreachable-overnight) |
 | DNS not resolving `*.lab.chaseconover.com` | Pi-hole hasn't loaded new config | `./scripts/deploy recover` |
 | HTTPS cert errors | Certs expired or not yet provisioned | Wait — Caddy auto-retries. Check logs. |
 | Container in restart loop | Bad config or missing volume | `./scripts/deploy status`, then check logs |
-| SSH connects but hangs | eth0 down, WiFi can't route replies | Reboot Pi with Ethernet cable plugged in |
+| `.local` hostname not resolving | Avahi confused by Docker interfaces | `sudo systemctl restart avahi-daemon` |
 | Deploy is slow | Caddy image rebuild or new image pull | Normal for first deploy; subsequent are cached |
 
 ## Services Unreachable After Reboot or Crash
@@ -114,19 +115,25 @@ Common causes:
 ### Can't connect at all
 
 ```bash
-ping chase-raspberrypi.local
-# or
 ping 192.168.1.167
 ```
 
 If no response:
 - Is the Pi powered on? Check the LED.
-- Is the Ethernet cable plugged in?
+- The Pi runs on WiFi only (no Ethernet cable) — check that the router is up
 - Try connecting by IP if mDNS isn't working: `ssh chaseconover@192.168.1.167`
 
-### SSH connects but hangs / times out
+### SSH to IP works but commands hang
 
-This happened when `eth0` lost carrier and `wlan0` took over. The WiFi interface can receive but may not transmit properly. Reboot the Pi with the Ethernet cable firmly plugged in.
+If `ssh chaseconover@192.168.1.167` opens an interactive session but
+`ssh chaseconover@192.168.1.167 "echo test"` hangs, this is WiFi degradation caused by
+NetworkManager managing Docker interfaces. See [WiFi Degradation](#wifi-degradation-services-unreachable-overnight).
+
+**Emergency workaround** (forces PTY allocation for the command):
+
+```bash
+ssh -tt chaseconover@192.168.1.167 "echo test"
+```
 
 ## Services Unreachable, Pi Responds to Ping but Not HTTP/DNS
 
@@ -163,13 +170,52 @@ restarts the compose stack via systemd, but if containers were already running w
 file handles from before the drive remount, they need a full restart to pick up the
 now-accessible files.
 
-## mDNS (`.local` Hostname) Not Working After Crash
+## WiFi Degradation (Services Unreachable Overnight)
+
+If the Pi becomes unreachable overnight — mDNS stops resolving, HTTPS services are down,
+non-interactive SSH (`ssh user@host "command"`) hangs but interactive SSH still works:
+
+**Root cause:** NetworkManager managing Docker's virtual network interfaces (`veth*`,
+`br-*`, `docker0`). As containers churn, NetworkManager processes each veth
+create/destroy event, flooding the network stack with "carrier lost / carrier acquired"
+events. Over hours, this degrades WiFi to the point where only interactive SSH (with PTY)
+works. WiFi power management compounds the problem — the chip sleeps during low-traffic
+periods and the degraded driver fails to wake it cleanly.
+
+**Prevention (applied by Ansible `base` role):**
+- NetworkManager ignores Docker interfaces via `/etc/NetworkManager/conf.d/docker-unmanaged.conf`
+- WiFi power save disabled via `/etc/NetworkManager/conf.d/wifi-powersave-off.conf`
+
+**If it happens anyway:**
+
+```bash
+# From the Pi (interactive SSH to 192.168.1.167):
+sudo systemctl restart NetworkManager
+# Wait a few seconds for WiFi to reconnect, then verify:
+ssh chaseconover@192.168.1.167 "echo test"
+```
+
+**Diagnosis commands:**
+
+```bash
+# Check if NetworkManager is managing Docker interfaces (bad — should be empty):
+nmcli con show --active | grep -E 'veth|br-|docker'
+
+# Check WiFi power management (should be "off"):
+sudo /sbin/iwconfig wlan0 | grep Power
+
+# Check for WiFi driver errors:
+dmesg | grep -i brcmf | tail -10
+```
+
+## mDNS (`.local` Hostname) Not Working
 
 If `chase-raspberrypi.local` doesn't resolve but `192.168.1.167` works:
 
 **Root cause:** Docker's virtual network interfaces (`veth*`) churning during container
 restarts confuses Avahi (mDNS daemon). Avahi logs will show repeated
-"New relevant interface / Interface no longer relevant" messages.
+"New relevant interface / Interface no longer relevant" messages. The NetworkManager
+Docker interface fix (above) also helps prevent this.
 
 **Fix:** Restart Avahi after containers have stabilized:
 

@@ -42,6 +42,29 @@
   loop: "{{ platform_external_drives }}"
   when: platform_external_drives is defined
 
+- name: Disable WiFi power management
+  ansible.builtin.copy:
+    dest: /etc/NetworkManager/conf.d/wifi-powersave-off.conf
+    content: |
+      [connection]
+      wifi.powersave = 2
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart NetworkManager
+  when: platform_wifi_disable_powersave | default(true)
+
+- name: Prevent NetworkManager from managing Docker interfaces
+  ansible.builtin.copy:
+    dest: /etc/NetworkManager/conf.d/docker-unmanaged.conf
+    content: |
+      [keyfile]
+      unmanaged-devices=interface-name:docker*;interface-name:veth*;interface-name:br-*
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart NetworkManager
+
 - name: Create platform directories
   ansible.builtin.file:
     path: "{{ item }}"

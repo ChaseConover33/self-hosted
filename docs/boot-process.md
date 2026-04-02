@@ -158,6 +158,19 @@ SD card and disk2. Purges backups older than 7 days.
 **What it does:** Captures lightweight host health data (disk usage, etc.)
 **Template:** `ansible/roles/monitoring/templates/host-healthcheck.sh.j2`
 
+## Known Issue: WiFi + Docker (NetworkManager)
+
+The Pi runs on WiFi only. Docker's virtual network interfaces (`veth*`, `br-*`) are
+tracked by NetworkManager by default, and the constant carrier state changes from
+container lifecycle events degrade WiFi over hours. This manifests as services becoming
+unreachable overnight while the Pi itself stays up.
+
+**Fix (applied by Ansible `base` role):** NetworkManager is configured to ignore Docker
+interfaces via `/etc/NetworkManager/conf.d/docker-unmanaged.conf`, and WiFi power
+management is disabled via `wifi-powersave-off.conf`. See
+[Troubleshooting > WiFi Degradation](troubleshooting.md#wifi-degradation-services-unreachable-overnight)
+for symptoms and diagnosis.
+
 ## Known Issue: Icy Box Dock (IB-1232CL-U3)
 
 The external drives are connected through an Icy Box IB-1232CL-U3 dual-bay USB 3.0

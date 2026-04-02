@@ -46,6 +46,18 @@ The homelab works with or without internet connectivity because Pi-hole answers 
 
 No router port forwards or public DNS exposure. Remote access is via Tailscale only.
 
+### WiFi-Only Networking
+
+The Pi connects via WiFi only (`wlan0`) — there is no Ethernet cable. `eth0` is always
+`NO-CARRIER`. The `base` Ansible role applies two critical NetworkManager configs:
+
+- **Docker interface isolation** — NetworkManager ignores `veth*`, `br-*`, and `docker0`
+  interfaces. Without this, Docker container lifecycle events flood NetworkManager with
+  carrier state changes, degrading WiFi over hours until non-interactive SSH and services
+  become unreachable.
+- **WiFi power save off** — disables the Broadcom brcmfmac driver's power management,
+  preventing the chip from sleeping during low-traffic periods (overnight).
+
 ## Storage Layout
 
 Boot-critical files (compose definitions, service configs, secrets) live on the SD card

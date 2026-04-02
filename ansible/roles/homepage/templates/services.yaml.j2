@@ -5,18 +5,28 @@
   'synapse': 'matrix',
   'vaultwarden': 'vaultwarden',
   'syncthing': 'syncthing',
-  'navidrome': 'navidrome'
+  'navidrome': 'navidrome',
+  'pihole': 'pi-hole'
+} %}
+{% set direct_access = {
+  'pihole': 'http://' ~ ansible_host ~ ':8080'
 } %}
 - Services:
-{% for service_item in platform_services | dict2items | selectattr('value.enabled') | selectattr('value.proxy_hosts', 'defined') | list %}
+{% for service_item in platform_services | dict2items | selectattr('value.enabled') | list %}
 {% set key = service_item.key %}
 {% set service = service_item.value %}
-{% if key != 'homepage' and key != 'demo_public' and key != 'demo_internal' %}
+{% if key != 'homepage' and key != 'demo_public' and key != 'demo_internal' and key != 'caddy' %}
+{% if service.proxy_hosts is defined or key in direct_access %}
     - {{ key | replace('_', ' ') | title }}:
+{% if service.proxy_hosts is defined %}
         href: "http://{{ service.proxy_hosts[0] }}"
+{% else %}
+        href: "{{ direct_access[key] }}"
+{% endif %}
         description: "{{ service.description }}"
 {% if key in icon_map %}
         icon: "{{ icon_map[key] }}.png"
+{% endif %}
 {% endif %}
 {% endif %}
 {% endfor %}
