@@ -11,14 +11,17 @@ ingest_category() {
 
   mkdir -p "${source_dir}" "${target_dir}"
 
-  if ! find "${source_dir}" -mindepth 1 -print -quit >/dev/null 2>&1; then
+  if [ -z "$(ls -A "${source_dir}" 2>/dev/null)" ]; then
     echo "No new ${category} media to ingest."
     return
   fi
 
   echo "Ingesting ${category} from ${source_dir} -> ${target_dir}"
-  rsync -a --remove-source-files "${source_dir}/" "${target_dir}/"
-  find "${source_dir}" -mindepth 1 -depth -type d -empty -delete
+  # mv is instant on the same filesystem (just updates directory entries).
+  # rsync would copy byte-by-byte even on the same partition.
+  for item in "${source_dir}"/*; do
+    mv -f "${item}" "${target_dir}/"
+  done
 }
 
 ingest_category movies
