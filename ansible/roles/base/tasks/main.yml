@@ -65,6 +65,44 @@
     mode: "0644"
   notify: restart NetworkManager
 
+- name: Install daily NetworkManager restart service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/networkmanager-restart.service
+    content: |
+      [Unit]
+      Description=Restart NetworkManager to prevent WiFi degradation
+      [Service]
+      Type=oneshot
+      ExecStart=/bin/systemctl restart NetworkManager
+    owner: root
+    group: root
+    mode: "0644"
+  when: platform_wifi_disable_powersave | default(true)
+
+- name: Install daily NetworkManager restart timer
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/networkmanager-restart.timer
+    content: |
+      [Unit]
+      Description=Restart NetworkManager daily to prevent WiFi stack degradation
+      [Timer]
+      OnCalendar=*-*-* 04:00:00
+      Persistent=true
+      [Install]
+      WantedBy=timers.target
+    owner: root
+    group: root
+    mode: "0644"
+  when: platform_wifi_disable_powersave | default(true)
+
+- name: Enable daily NetworkManager restart timer
+  ansible.builtin.systemd:
+    name: networkmanager-restart.timer
+    state: started
+    enabled: true
+    daemon_reload: true
+  when: platform_wifi_disable_powersave | default(true)
+
 - name: Create platform directories
   ansible.builtin.file:
     path: "{{ item }}"

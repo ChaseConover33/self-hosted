@@ -13,6 +13,7 @@ Common issues and how to resolve them using the project's scripts.
 | HTTPS cert errors | Certs expired or not yet provisioned | Wait — Caddy auto-retries. Check logs. |
 | Container in restart loop | Bad config or missing volume | `./scripts/deploy status`, then check logs |
 | `.local` hostname not resolving | Avahi confused by Docker interfaces | `sudo systemctl restart avahi-daemon` |
+| WiFi network changed, can't SSH in | Need to update WiFi config on SD card | See [Changing WiFi Without a Monitor](#changing-wifi-without-a-monitor-or-keyboard) |
 | Deploy is slow | Caddy image rebuild or new image pull | Normal for first deploy; subsequent are cached |
 
 ## Services Unreachable After Reboot or Crash
@@ -305,6 +306,101 @@ Persistent journal is enabled (`/var/log/journal/`) so crash logs survive reboot
 ```bash
 ssh chaseconover@chase-raspberrypi.local
 journalctl -b -1 --priority=err --no-pager | tail -30
+```
+
+## Changing WiFi Without a Monitor or Keyboard
+
+If the Pi's WiFi network changes (new router, new SSID/password) and you can't SSH in,
+you need to edit the WiFi config directly on the SD card. The Pi runs on WiFi only — there
+is no Ethernet cable.
+
+**What doesn't work on Bookworm:**
+- `wpa_supplicant.conf` on the boot partition (removed in Bookworm)
+- `network-config` on the boot partition (cloud-init, first boot only)
+- `/boot/firmware/NetworkManager/system-connections/` (first boot only)
+
+**What works:** Editing the netplan YAML on the root (ext4) partition. macOS can't write
+to ext4 natively, so use a Linux VM.
+
+### Step-by-Step: Edit WiFi via UTM (Debian VM)
+
+1. **Shut down the Pi** and remove the SD card
+
+2. **Insert the SD card** into your Mac (via USB adapter)
+
+3. **Unmount on macOS** so the VM can access it:
+
+   ```bash
+   diskutil unmountDisk /dev/disk4    # check `diskutil list` for your disk number
+   ```
+
+4. **Attach the SD card to your UTM VM** — in the VM settings, pass through the USB
+   device (the SD card reader) to the VM
+
+5. **Mount the root partition** inside the VM:
+
+   ```bash
+   sudo mkdir -p /mnt/pi
+   sudo mount /dev/sda2 /mnt/pi      # sda2 is typically the root partition
+   lsblk                              # verify — look for the ~120GB partition
+   ```
+
+6. **Edit the WiFi netplan config:**
+
+   ```bash
+   sudo nano /mnt/pi/etc/netplan/90-NM-282af825-c829-3980-9cb3-2edc030c596b.yaml
+   ```
+
+   The file looks like this — replace the SSID and password:
+
+   ```yaml
+   network:
+     version: 2
+     wifis:
+       wlan0:
+         renderer: NetworkManager
+         match: {}
+         dhcp4: true
+         access-points:
+           "NEW_WIFI_SSID":
+             auth:
+               key-management: "psk"
+               password: "NEW_WIFI_PASSWORD"
+           "PHONE_HOTSPOT_SSID":
+             auth:
+               key-management: "psk"
+               password: "HOTSPOT_PASSWORD"
+   ```
+
+   Including a phone hotspot entry as a fallback is recommended so you're never fully
+   locked out — if the primary WiFi is unavailable, the Pi will connect to your phone
+   hotspot instead.
+
+7. **Unmount and eject:**
+
+   ```bash
+   sudo umount /mnt/pi
+   ```
+
+8. **Eject the SD card** from UTM/Mac, insert it back into the Pi, and power on
+
+9. **Find the Pi's new IP** — check your router's DHCP client list, or try:
+
+   ```bash
+   ping chase-raspberrypi.local
+   ```
+
+**Note:** The netplan YAML filename contains a UUID. If your Pi has a different file,
+use `ls /mnt/pi/etc/netplan/` to find it. Look for the one containing `wifis:`.
+
+### Alternative: Wired Keyboard + Monitor
+
+If you have a USB keyboard and a micro-HDMI cable/adapter (Pi 5 uses micro-HDMI), plug
+them in, log in at the console, and run:
+
+```bash
+sudo nmcli dev wifi connect "NEW_SSID" password "NEW_PASSWORD"
+sudo nmcli dev wifi connect "PHONE_HOTSPOT" password "HOTSPOT_PASSWORD" autoconnect yes
 ```
 
 ## Diagnostic Commands

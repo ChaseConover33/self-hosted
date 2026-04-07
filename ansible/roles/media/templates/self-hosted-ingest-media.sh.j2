@@ -4,6 +4,191 @@ set -euo pipefail
 upload_root="{{ platform_upload_root }}/incoming"
 media_root="{{ platform_media_root }}"
 
+# ---------------------------------------------------------------------------
+# clean_movie_name — normalize a torrent folder/file name to "Title (Year)"
+#
+# Examples:
+#   "www.Torrenting.com - American.Psycho.2000.Remastered.1080p" -> "American Psycho (2000)"
+#   "Dog.Day.Afternoon.1975.720p.BluRay.x265-GalaxyRG[TGx]"    -> "Dog Day Afternoon (1975)"
+#   "Chinatown (1974)"                                           -> "Chinatown (1974)"
+# ---------------------------------------------------------------------------
+clean_movie_name() {
+  local raw="$1"
+
+  # Strip site prefixes like "www.Torrenting.com - " or "www.Torrenting.com   -    "
+  raw="$(echo "$raw" | sed -E 's/^www\.[^ ]+ +- +//')"
+
+  # If already in "Title (Year)" format (possibly with trailing junk), extract it
+  if [[ "$raw" =~ ^(.+)\ \(([0-9]{4})\) ]]; then
+    local title="${BASH_REMATCH[1]}"
+    local year="${BASH_REMATCH[2]}"
+    echo "${title} (${year})"
+    return
+  fi
+
+  # Replace dots with spaces (but preserve the string for regex)
+  local spaced
+  spaced="$(echo "$raw" | tr '.' ' ')"
+
+  # Extract year — first 4-digit number that looks like a year (1900-2099)
+  if [[ "$spaced" =~ ^(.*[^0-9])(19[0-9]{2}|20[0-9]{2})([^0-9].*)?$ ]]; then
+    local title="${BASH_REMATCH[1]}"
+    local year="${BASH_REMATCH[2]}"
+
+    # Trim trailing spaces/dashes from the title
+    title="$(echo "$title" | sed -E 's/[[:space:]_-]+$//')"
+
+    echo "${title} (${year})"
+    return
+  fi
+
+  # Couldn't parse — return original
+  echo "$raw"
+}
+
+# ---------------------------------------------------------------------------
+# clean_show_name — normalize a torrent show folder to "Title (Year)" or "Title"
+#
+# Examples:
+#   "South Park Season 1 to 26 Mp4 1080p"         -> "South Park"
+#   "Family Guy - Seasons 1 to 20"                 -> "Family Guy"
+#   "Breaking.Bad.S01-S05.1080p.BluRay"            -> "Breaking Bad"
+#   "Better Call Saul (2015)"                       -> "Better Call Saul (2015)"
+#   "www.Torrenting.com - The.Office.US.Complete"   -> "The Office US"
+# ---------------------------------------------------------------------------
+clean_show_name() {
+  local raw="$1"
+
+  # Strip site prefixes
+  raw="$(echo "$raw" | sed -E 's/^www\.[^ ]+ +- +//')"
+
+  # If already in "Title (Year)" format, keep it
+  if [[ "$raw" =~ ^(.+)\ \(([0-9]{4})\)$ ]]; then
+    echo "$raw"
+    return
+  fi
+
+  # Replace dots with spaces
+  local spaced
+  spaced="$(echo "$raw" | tr '.' ' ')"
+
+  # Strip everything from common show-pack markers onward:
+  # "Season(s) X", "S01", "Complete", "1080p", "720p", "Mp4", "BluRay", etc.
+  local title
+  title="$(echo "$spaced" | sed -E 's/ *([-] *)?([Ss]easons?|[Ss][0-9]|[Cc]omplete|1080p|720p|480p|[Mm]p4|[Bb]lu[Rr]ay|[Hh][Dd][Rr]ip|[Ww][Ee][Bb]-?[DdRr][Ll]|[Xx]264|[Xx]265|[Hh][Ee][Vv][Cc]|HEVC|AAC|AC3|[Ee]ng|[Mm]ulti).*//')"
+
+  # Trim trailing spaces/dashes/hyphens
+  title="$(echo "$title" | sed -E 's/[[:space:]_-]+$//')"
+
+  # Try to extract a year if one appears at the end of what remains
+  if [[ "$title" =~ ^(.+)\ (19[0-9]{2}|20[0-9]{2})$ ]]; then
+    echo "${BASH_REMATCH[1]} (${BASH_REMATCH[2]})"
+    return
+  fi
+
+  [ -n "$title" ] && echo "$title" || echo "$raw"
+}
+
+# ---------------------------------------------------------------------------
+# cleanup_shows — normalize show folder names and season subdirs before ingesting
+# ---------------------------------------------------------------------------
+cleanup_shows() {
+  local source_dir="${upload_root}/shows"
+
+  for item in "${source_dir}"/*; do
+    [ -d "$item" ] || continue
+    local basename
+    basename="$(basename "$item")"
+    local clean
+    clean="$(clean_show_name "$basename")"
+
+    if [ "$basename" != "$clean" ]; then
+      # If the clean name already exists, merge into it
+      if [ -d "${source_dir}/${clean}" ]; then
+        # Move season dirs and loose files into the existing clean dir
+        for sub in "$item"/*; do
+          [ -e "$sub" ] || continue
+          mv -f "$sub" "${source_dir}/${clean}/"
+        done
+        rmdir "$item" 2>/dev/null || rm -rf "$item"
+      else
+        mv -f "$item" "${source_dir}/${clean}"
+      fi
+      echo "  Cleaned: ${basename} -> ${clean}"
+    fi
+  done
+
+  # Normalize season folder names inside each show (e.g. "Season 1" -> "Season 01")
+  for show in "${source_dir}"/*; do
+    [ -d "$show" ] || continue
+    for season in "$show"/*/; do
+      [ -d "$season" ] || continue
+      local sname
+      sname="$(basename "$season")"
+      # Match "Season X" where X is a single digit and pad it
+      if [[ "$sname" =~ ^[Ss]eason\ ([0-9])$ ]]; then
+        local padded="Season 0${BASH_REMATCH[1]}"
+        if [ "$sname" != "$padded" ]; then
+          mv -f "$season" "$(dirname "$season")/${padded}"
+        fi
+      fi
+    done
+  done
+}
+
+# ---------------------------------------------------------------------------
+# cleanup_movies — normalize folder names and remove junk before ingesting
+# ---------------------------------------------------------------------------
+cleanup_movies() {
+  local source_dir="${upload_root}/movies"
+
+  for item in "${source_dir}"/*; do
+    [ -e "$item" ] || continue
+    local basename
+    basename="$(basename "$item")"
+    local clean
+    clean="$(clean_movie_name "$basename")"
+
+    if [ -d "$item" ]; then
+      # Remove sample and extras files/dirs
+      find "$item" -iname 'sample*' -delete 2>/dev/null || true
+      find "$item" -maxdepth 1 -type d -iname 'extras' -exec rm -rf {} + 2>/dev/null || true
+      find "$item" -maxdepth 1 -type d -iname 'sample*' -exec rm -rf {} + 2>/dev/null || true
+
+      # Find the main video file (largest file in the directory)
+      local main_file
+      main_file="$(find "$item" -type f \( -name '*.mkv' -o -name '*.mp4' -o -name '*.avi' \) -printf '%s %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)"
+
+      if [ -z "$main_file" ]; then
+        echo "  Skipping ${basename} — no video file found"
+        continue
+      fi
+
+      local ext="${main_file##*.}"
+
+      # Create clean folder and move the main video file
+      mkdir -p "${source_dir}/${clean}"
+      mv -f "$main_file" "${source_dir}/${clean}/${clean}.${ext}"
+
+      # Move subtitle files (.srt, .sub, .ass) if present
+      find "$item" -maxdepth 2 -type f \( -name '*.srt' -o -name '*.sub' -o -name '*.ass' \) -exec mv -f {} "${source_dir}/${clean}/" \; 2>/dev/null || true
+
+      # Remove the old directory if it's different from the clean one
+      if [ "$basename" != "$clean" ] && [ -d "$item" ]; then
+        rm -rf "$item"
+      fi
+
+      echo "  Cleaned: ${basename} -> ${clean}"
+    elif [ -f "$item" ]; then
+      # Loose file — wrap it in a folder
+      local ext="${item##*.}"
+      mkdir -p "${source_dir}/${clean}"
+      mv -f "$item" "${source_dir}/${clean}/${clean}.${ext}"
+      echo "  Cleaned: ${basename} -> ${clean}/${clean}.${ext}"
+    fi
+  done
+}
+
 ingest_category() {
   local category="$1"
   local source_dir="${upload_root}/${category}"
@@ -16,10 +201,20 @@ ingest_category() {
     return
   fi
 
+  # Clean up names before ingesting
+  if [ "$category" = "movies" ]; then
+    echo "Cleaning up movie names..."
+    cleanup_movies
+  elif [ "$category" = "shows" ]; then
+    echo "Cleaning up show names..."
+    cleanup_shows
+  fi
+
   echo "Ingesting ${category} from ${source_dir} -> ${target_dir}"
   # mv is instant on the same filesystem (just updates directory entries).
   # rsync would copy byte-by-byte even on the same partition.
   for item in "${source_dir}"/*; do
+    [ -e "$item" ] || continue
     mv -f "${item}" "${target_dir}/"
   done
 }
