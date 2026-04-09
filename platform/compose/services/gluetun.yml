@@ -1,0 +1,26 @@
+services:
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    env_file:
+      - ${PLATFORM_SECRETS_ROOT}/gluetun.env
+    environment:
+      TZ: America/Denver
+      # Kill switch is enabled by default — if the VPN drops,
+      # all traffic is blocked. Transmission cannot leak.
+      FIREWALL_VPN_INPUT_PORTS: "51413"
+      # Allow Transmission web UI to be reached from the Docker network (Caddy)
+      FIREWALL_INPUT_PORTS: "9091"
+    ports:
+      # Transmission ports are exposed here because Transmission
+      # uses gluetun's network stack
+      - "51413:51413"
+      - "51413:51413/udp"
+    volumes:
+      - ${PLATFORM_CONFIG_ROOT}/gluetun:/gluetun
+    networks:
+      - internal

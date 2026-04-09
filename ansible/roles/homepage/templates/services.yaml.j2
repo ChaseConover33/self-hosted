@@ -9,7 +9,7 @@
   'pihole': 'pi-hole'
 } %}
 {% set direct_access = {
-  'pihole': 'http://' ~ ansible_host ~ ':8080'
+  'pihole': 'http://' ~ (platform_tailscale_ip | default(ansible_host)) ~ ':8080'
 } %}
 - Services:
 {% for service_item in platform_services | dict2items | selectattr('value.enabled') | list %}

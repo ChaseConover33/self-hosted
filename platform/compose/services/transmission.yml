@@ -1,0 +1,21 @@
+services:
+  transmission:
+    image: linuxserver/transmission:latest
+    restart: unless-stopped
+    # Route ALL traffic through gluetun's VPN tunnel.
+    # Transmission has no direct internet access — if the VPN drops,
+    # gluetun's kill switch blocks all traffic automatically.
+    network_mode: service:gluetun
+    depends_on:
+      - gluetun
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: America/Denver
+      PEERPORT: "51413"
+      # Allow web UI access from Docker network (Caddy proxies to this)
+      TRANSMISSION_RPC_WHITELIST_ENABLED: "false"
+      TRANSMISSION_RPC_HOST_WHITELIST_ENABLED: "false"
+    volumes:
+      - ${PLATFORM_CONFIG_ROOT}/transmission:/config
+      - ${PLATFORM_UPLOAD_ROOT}/incoming:/downloads

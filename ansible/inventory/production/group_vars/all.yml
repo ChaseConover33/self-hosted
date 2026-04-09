@@ -63,10 +63,10 @@ platform_firewall_extra_tcp_ports:
   - 8080
   - 8000
   - 2222
-  - 6881
+  - 51413
 platform_firewall_extra_udp_ports:
   - 53
-  - 6881
+  - 51413
 
 platform_backup_enabled: true
 platform_backup_retention_days: 7
@@ -78,6 +78,7 @@ platform_backup_paths:
 
 platform_managed_directories:
   - path: "{{ platform_config_root }}/caddy"
+  - path: "{{ platform_config_root }}/gluetun"
   - path: "{{ platform_data_root }}/uptime-kuma"
   - path: "{{ platform_data_root }}/vikunja"
     owner: "1000"
@@ -125,6 +126,7 @@ platform_managed_directories:
     owner: "70"
     group: "70"
   - path: "{{ platform_config_root }}/qbittorrent"
+  - path: "{{ platform_config_root }}/transmission"
   - path: "{{ platform_data_root }}/trader/logs"
   - path: "{{ platform_upload_root }}"
     owner: "{{ platform_upload_user }}"
@@ -315,14 +317,35 @@ platform_services:
     backup: true
     required_secret_files:
       - "{{ platform_secrets_root }}/gitea.env"
-  qbittorrent:
+  gluetun:
     enabled: true
+    compose_files:
+      - services/gluetun.yml
+    description: VPN tunnel (NordVPN WireGuard) for torrent traffic — kill switch enabled
+    tier: tier1
+    ram_profile: low
+    backup: false
+    required_secret_files:
+      - "{{ platform_secrets_root }}/gluetun.env"
+  qbittorrent:
+    enabled: false
     compose_files:
       - services/qbittorrent.yml
     proxy_hosts:
       - torrents.lab.chaseconover.com
-    upstream: qbittorrent:8080
-    description: Torrent client with web UI for downloading media and books
+    upstream: gluetun:8080
+    description: Torrent client with web UI — routed through gluetun VPN (disabled — peer issues with gluetun)
+    tier: tier1
+    ram_profile: low
+    backup: true
+  transmission:
+    enabled: true
+    compose_files:
+      - services/transmission.yml
+    proxy_hosts:
+      - torrents.lab.chaseconover.com
+    upstream: gluetun:9091
+    description: Torrent client with web UI — routed through gluetun VPN
     tier: tier1
     ram_profile: low
     backup: true

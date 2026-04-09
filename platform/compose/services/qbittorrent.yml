@@ -2,6 +2,12 @@ services:
   qbittorrent:
     image: linuxserver/qbittorrent:latest
     restart: unless-stopped
+    # Route ALL traffic through gluetun's VPN tunnel.
+    # qBittorrent has no direct internet access — if the VPN drops,
+    # gluetun's kill switch blocks all traffic automatically.
+    network_mode: service:gluetun
+    depends_on:
+      - gluetun
     environment:
       PUID: "1000"
       PGID: "1000"
@@ -10,8 +16,3 @@ services:
     volumes:
       - ${PLATFORM_CONFIG_ROOT}/qbittorrent:/config
       - ${PLATFORM_UPLOAD_ROOT}/incoming:/downloads
-    ports:
-      - "6881:6881"
-      - "6881:6881/udp"
-    networks:
-      - internal
