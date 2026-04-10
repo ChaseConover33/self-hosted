@@ -359,6 +359,17 @@ platform_services:
     backup: true
     required_secret_files:
       - "{{ platform_secrets_root }}/trader.env"
+  costs:
+    enabled: true
+    compose_files:
+      - services/costs.yml
+    proxy_hosts:
+      - costs.lab.chaseconover.com
+    upstream: costs:8080
+    description: Hardware and electricity cost calculator for the homelab
+    tier: baseline
+    ram_profile: low
+    backup: false
 
 platform_tailscale_helpers_enabled: true
 

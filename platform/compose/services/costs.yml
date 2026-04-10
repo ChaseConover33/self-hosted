@@ -1,0 +1,11 @@
+services:
+  costs:
+    image: halverneus/static-file-server:latest
+    restart: unless-stopped
+    environment:
+      FOLDER: /web
+      PORT: "8080"
+    volumes:
+      - ${PLATFORM_COMPOSE_ROOT}/static/costs:/web:ro
+    networks:
+      - internal

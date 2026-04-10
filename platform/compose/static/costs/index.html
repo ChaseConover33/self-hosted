@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Homelab Costs</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: #1a1a1a;
+    color: #e0e0e0;
+    margin: 0;
+    padding: 2rem;
+    line-height: 1.6;
+  }
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  h1 {
+    color: #4a9aba;
+    border-bottom: 2px solid #333;
+    padding-bottom: 0.5rem;
+  }
+  h2 {
+    color: #7aba50;
+    margin-top: 2rem;
+  }
+  .card {
+    background: #252525;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+    border: 1px solid #333;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.5rem;
+  }
+  td, th {
+    padding: 0.5rem;
+    text-align: left;
+    border-bottom: 1px solid #333;
+  }
+  th {
+    color: #aaa;
+    font-weight: normal;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+  }
+  td.cost {
+    text-align: right;
+    color: #c8a030;
+    font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
+  }
+  tr.total td {
+    border-top: 2px solid #555;
+    border-bottom: none;
+    padding-top: 1rem;
+    font-weight: bold;
+    font-size: 1.1rem;
+    color: #e0e0e0;
+  }
+  tr.total td.cost {
+    color: #7aba50;
+  }
+  .input-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 1rem 0;
+    flex-wrap: wrap;
+  }
+  label {
+    color: #aaa;
+    min-width: 200px;
+  }
+  input[type="number"], select {
+    background: #1a1a1a;
+    border: 1px solid #444;
+    color: #e0e0e0;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 1rem;
+  }
+  input[type="number"] {
+    width: 120px;
+  }
+  select {
+    width: 220px;
+  }
+  input[type="number"]:focus, select:focus {
+    outline: none;
+    border-color: #4a9aba;
+  }
+  .result {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+  .result-card {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 1rem;
+    text-align: center;
+  }
+  .result-card .label {
+    font-size: 0.75rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .result-card .value {
+    font-size: 1.5rem;
+    color: #7aba50;
+    font-weight: bold;
+    margin-top: 0.25rem;
+    font-family: "SF Mono", Menlo, Monaco, Consolas, monospace;
+  }
+  .note {
+    color: #888;
+    font-size: 0.85rem;
+    margin-top: 1rem;
+    font-style: italic;
+  }
+  a {
+    color: #4a9aba;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Homelab Costs</h1>
+  <p>Total cost of running this self-hosted infrastructure.</p>
+
+  <h2>Hardware (one-time)</h2>
+  <div class="card">
+    <table>
+      <thead>
+        <tr><th>Item</th><th style="text-align:right">Cost</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Raspberry Pi 5 16GB Kit</td><td class="cost">$285.58</td></tr>
+        <tr><td>2x Seagate Exos 30TB HDDs</td><td class="cost">$1,313.98</td></tr>
+        <tr><td>Icy Box IB-1232CL-U3 Dock</td><td class="cost">$35.18</td></tr>
+        <tr class="total"><td>Total Hardware</td><td class="cost">$1,634.74</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Electricity (recurring)</h2>
+  <div class="card">
+    <p>Estimated power draw is based on typical operating consumption. Adjust your electricity rate below — check your power bill for the exact $/kWh.</p>
+
+    <div class="input-row">
+      <label for="state">Auto-fill by US state:</label>
+      <select id="state">
+        <option value="">-- Select --</option>
+      </select>
+    </div>
+
+    <div class="input-row">
+      <label for="rate">Electricity rate ($/kWh):</label>
+      <input type="number" id="rate" value="0.15" step="0.01" min="0">
+    </div>
+
+    <div class="input-row">
+      <label for="watts">Average power draw (W):</label>
+      <input type="number" id="watts" value="26" step="1" min="0">
+    </div>
+
+    <div class="result">
+      <div class="result-card">
+        <div class="label">Per Day</div>
+        <div class="value" id="daily">$0.00</div>
+      </div>
+      <div class="result-card">
+        <div class="label">Per Month</div>
+        <div class="value" id="monthly">$0.00</div>
+      </div>
+      <div class="result-card">
+        <div class="label">Per Year</div>
+        <div class="value" id="yearly">$0.00</div>
+      </div>
+    </div>
+
+    <p class="note">
+      Power draw breakdown (estimated 24/7 average):<br>
+      Pi 5: ~7W &middot; 2x HDDs: ~16W &middot; Dock: ~3W &middot; Total: ~26W
+    </p>
+  </div>
+
+  <h2>Total Cost of Ownership</h2>
+  <div class="card">
+    <p>Hardware + electricity over time:</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Period</th>
+          <th style="text-align:right">Total</th>
+          <th style="text-align:right">Monthly equivalent</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1 year</td>
+          <td class="cost" id="tco1">$0.00</td>
+          <td class="cost" id="tco1m">$0.00</td>
+        </tr>
+        <tr>
+          <td>3 years</td>
+          <td class="cost" id="tco3">$0.00</td>
+          <td class="cost" id="tco3m">$0.00</td>
+        </tr>
+        <tr>
+          <td>5 years</td>
+          <td class="cost" id="tco5">$0.00</td>
+          <td class="cost" id="tco5m">$0.00</td>
+        </tr>
+        <tr>
+          <td>10 years</td>
+          <td class="cost" id="tco10">$0.00</td>
+          <td class="cost" id="tco10m">$0.00</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="note">
+      The monthly equivalent amortizes hardware plus electricity across the period. Over 5+ years,
+      running your own server works out to just a few dollars a month &mdash; mostly electricity, since
+      the hardware has long since paid for itself.
+    </p>
+    <p class="note">
+      For comparison, common monthly services:<br>
+      Netflix Premium ~$23/mo &middot; Plex Pass ~$5/mo ($120 lifetime) &middot;
+      Google One 2TB ~$10/mo &middot; iCloud+ 2TB ~$10/mo &middot;
+      Comparable cloud VM (4 vCPU, 16GB RAM) ~$50&ndash;100/mo (before 60TB of storage).
+    </p>
+  </div>
+</div>
+
+<script>
+  const HARDWARE_TOTAL = 1634.74;
+  const HOURS_PER_DAY = 24;
+  const DAYS_PER_MONTH = 30.44;
+  const DAYS_PER_YEAR = 365.25;
+
+  // Average residential electricity rates by US state (cents/kWh).
+  // Source: EIA Electric Power Monthly, latest available data.
+  // Updated annually — these are state averages, not actual utility rates.
+  const STATE_RATES = {
+    "AL": 0.149, "AK": 0.246, "AZ": 0.143, "AR": 0.122, "CA": 0.314,
+    "CO": 0.156, "CT": 0.330, "DE": 0.169, "DC": 0.181, "FL": 0.150,
+    "GA": 0.147, "HI": 0.418, "ID": 0.114, "IL": 0.171, "IN": 0.158,
+    "IA": 0.140, "KS": 0.146, "KY": 0.135, "LA": 0.122, "ME": 0.249,
+    "MD": 0.184, "MA": 0.305, "MI": 0.193, "MN": 0.157, "MS": 0.137,
+    "MO": 0.135, "MT": 0.124, "NE": 0.119, "NV": 0.166, "NH": 0.244,
+    "NJ": 0.190, "NM": 0.151, "NY": 0.241, "NC": 0.137, "ND": 0.116,
+    "OH": 0.165, "OK": 0.130, "OR": 0.137, "PA": 0.184, "RI": 0.281,
+    "SC": 0.149, "SD": 0.130, "TN": 0.130, "TX": 0.151, "UT": 0.117,
+    "VT": 0.226, "VA": 0.155, "WA": 0.117, "WV": 0.155, "WI": 0.169,
+    "WY": 0.118
+  };
+
+  const STATE_NAMES = {
+    "AL": "Alabama", "AK": "Alaska", "AZ": "Arizona", "AR": "Arkansas",
+    "CA": "California", "CO": "Colorado", "CT": "Connecticut", "DE": "Delaware",
+    "DC": "District of Columbia", "FL": "Florida", "GA": "Georgia", "HI": "Hawaii",
+    "ID": "Idaho", "IL": "Illinois", "IN": "Indiana", "IA": "Iowa",
+    "KS": "Kansas", "KY": "Kentucky", "LA": "Louisiana", "ME": "Maine",
+    "MD": "Maryland", "MA": "Massachusetts", "MI": "Michigan", "MN": "Minnesota",
+    "MS": "Mississippi", "MO": "Missouri", "MT": "Montana", "NE": "Nebraska",
+    "NV": "Nevada", "NH": "New Hampshire", "NJ": "New Jersey", "NM": "New Mexico",
+    "NY": "New York", "NC": "North Carolina", "ND": "North Dakota", "OH": "Ohio",
+    "OK": "Oklahoma", "OR": "Oregon", "PA": "Pennsylvania", "RI": "Rhode Island",
+    "SC": "South Carolina", "SD": "South Dakota", "TN": "Tennessee", "TX": "Texas",
+    "UT": "Utah", "VT": "Vermont", "VA": "Virginia", "WA": "Washington",
+    "WV": "West Virginia", "WI": "Wisconsin", "WY": "Wyoming"
+  };
+
+  // Populate state dropdown
+  const stateSelect = document.getElementById('state');
+  Object.keys(STATE_NAMES).sort((a, b) => STATE_NAMES[a].localeCompare(STATE_NAMES[b])).forEach(code => {
+    const opt = document.createElement('option');
+    opt.value = code;
+    opt.textContent = STATE_NAMES[code] + ' ($' + STATE_RATES[code].toFixed(3) + '/kWh)';
+    stateSelect.appendChild(opt);
+  });
+
+  function recalc() {
+    const rate = parseFloat(document.getElementById('rate').value) || 0;
+    const watts = parseFloat(document.getElementById('watts').value) || 0;
+    const kw = watts / 1000;
+
+    const dailyCost = kw * HOURS_PER_DAY * rate;
+    const monthlyCost = dailyCost * DAYS_PER_MONTH;
+    const yearlyCost = dailyCost * DAYS_PER_YEAR;
+
+    document.getElementById('daily').textContent = '$' + dailyCost.toFixed(2);
+    document.getElementById('monthly').textContent = '$' + monthlyCost.toFixed(2);
+    document.getElementById('yearly').textContent = '$' + yearlyCost.toFixed(2);
+
+    const periods = [1, 3, 5, 10];
+    periods.forEach(years => {
+      const total = HARDWARE_TOTAL + yearlyCost * years;
+      const perMonth = total / (years * 12);
+      document.getElementById('tco' + years).textContent = '$' + total.toFixed(2);
+      document.getElementById('tco' + years + 'm').textContent = '$' + perMonth.toFixed(2) + '/mo';
+    });
+  }
+
+  stateSelect.addEventListener('change', (e) => {
+    if (e.target.value && STATE_RATES[e.target.value]) {
+      document.getElementById('rate').value = STATE_RATES[e.target.value].toFixed(3);
+      recalc();
+    }
+  });
+
+  document.getElementById('rate').addEventListener('input', recalc);
+  document.getElementById('watts').addEventListener('input', recalc);
+  recalc();
+</script>
+</body>
+</html>
