@@ -1,0 +1,11 @@
+services:
+  portainer:
+    image: portainer/portainer-ce:latest
+    restart: unless-stopped
+    # Portainer needs the Docker socket to manage containers.
+    # This gives it full control over Docker — treat it like root access.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${PLATFORM_DATA_ROOT}/portainer:/data
+    networks:
+      - internal

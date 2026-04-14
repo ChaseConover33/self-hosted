@@ -31,4 +31,16 @@ case "${mode}" in
 esac
 
 cd "${ansible_dir}"
+
+# Before deploying, clean up any stopped/dead containers on the Pi
+# to prevent name conflicts when Docker Compose recreates containers.
+# This is safe — it only removes containers that are already stopped.
+if [[ "${mode}" == "deploy" || "${mode}" == "bootstrap" || "${mode}" == "compose" ]]; then
+  echo "Cleaning up stopped containers..."
+  ssh -o StrictHostKeyChecking=no \
+    -i ~/.ssh/id_rsa \
+    chaseconover@192.168.1.167 \
+    "sudo docker container prune -f" 2>/dev/null || true
+fi
+
 ansible-playbook "${playbook}"

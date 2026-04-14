@@ -1,0 +1,14 @@
+services:
+  pinchflat:
+    image: ghcr.io/kieraneglin/pinchflat:dev
+    restart: unless-stopped
+    environment:
+      TZ: America/Denver
+      # Run as host UID 1000 so files are owned by chaseconover, not root
+      UID: "1000"
+      GID: "1000"
+    volumes:
+      - ${PLATFORM_CONFIG_ROOT}/pinchflat:/config
+      - ${PLATFORM_MEDIA_ROOT}/youtube:/downloads
+    networks:
+      - internal

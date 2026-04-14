@@ -146,6 +146,14 @@ platform_managed_directories:
   - path: "{{ platform_media_root }}/music"
   - path: "{{ platform_media_root }}/movies"
   - path: "{{ platform_media_root }}/shows"
+  - path: "{{ platform_media_root }}/youtube"
+    owner: "1000"
+    group: "1000"
+  - path: "{{ platform_data_root }}/portainer"
+  - path: "{{ platform_config_root }}/grocy"
+  - path: "{{ platform_config_root }}/pinchflat"
+    owner: "1000"
+    group: "1000"
 
 platform_monitoring_enabled: true
 platform_monitoring_schedule: "*-*-* *:00:00"
@@ -231,7 +239,7 @@ platform_services:
     required_secret_files:
       - "{{ platform_secrets_root }}/firefly.env"
   demo_public:
-    enabled: true
+    enabled: false
     compose_files:
       - services/demo-public.yml
     proxy_hosts:
@@ -242,7 +250,7 @@ platform_services:
     ram_profile: low
     backup: false
   demo_internal:
-    enabled: true
+    enabled: false
     compose_files:
       - services/demo-internal.yml
     description: Sample internal-only service for validating internal networking
@@ -370,6 +378,39 @@ platform_services:
     tier: baseline
     ram_profile: low
     backup: false
+  portainer:
+    enabled: true
+    compose_files:
+      - services/portainer.yml
+    proxy_hosts:
+      - docker.lab.chaseconover.com
+    upstream: portainer:9000
+    description: Docker container management UI — start, stop, restart, view logs
+    tier: baseline
+    ram_profile: low
+    backup: false
+  grocy:
+    enabled: true
+    compose_files:
+      - services/grocy.yml
+    proxy_hosts:
+      - pantry.lab.chaseconover.com
+    upstream: grocy:80
+    description: Food inventory and household management — tracks stock, calories, expiration dates
+    tier: tier1
+    ram_profile: low
+    backup: true
+  pinchflat:
+    enabled: true
+    compose_files:
+      - services/pinchflat.yml
+    proxy_hosts:
+      - youtube.lab.chaseconover.com
+    upstream: pinchflat:8945
+    description: YouTube archiver — download channels and playlists for offline viewing
+    tier: tier1
+    ram_profile: low
+    backup: true
 
 platform_tailscale_helpers_enabled: true
 
