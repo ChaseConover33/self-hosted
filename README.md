@@ -4,6 +4,8 @@ Self-hosted platform on a Raspberry Pi 5 using Ansible, Docker Compose, and Tail
 
 All services are available at `https://<name>.lab.chaseconover.com` with automatic Let's Encrypt certificates. Remote access is via Tailscale with ACL-based friend access.
 
+A small set of services are also exposed publicly via Cloudflare Tunnel at non-`*.lab.*` hostnames. See [Cloudflare Tunnel](docs/cloudflare-tunnel.md) for the routing model and security boundaries.
+
 ## Running Services
 
 | Service | URL | Purpose |
@@ -14,10 +16,12 @@ All services are available at `https://<name>.lab.chaseconover.com` with automat
 | Vikunja | `tasks.lab.chaseconover.com` | Task management |
 | Firefly III | `finance.lab.chaseconover.com` | Personal finance |
 | Synapse | `chat.lab.chaseconover.com` | Matrix chat server |
-| qBittorrent | `torrents.lab.chaseconover.com` | Torrent client (auth-protected) |
+| Transmission | `torrents.lab.chaseconover.com` | Torrent client (routed through gluetun VPN) |
 | Homepage | `home.lab.chaseconover.com` | Service dashboard |
 | Uptime Kuma | `status.lab.chaseconover.com` | Availability monitoring |
 | Pi-hole | `http://192.168.1.167:8080` | DNS ad blocker (admin UI) |
+| Chronicle | `https://journal.chaseconover.com` | Personal journal — **public** via Cloudflare Tunnel, gated by Clerk auth |
+| Cloudflared | (no UI) | Cloudflare Tunnel daemon for public-facing services |
 
 ## Common Commands
 
@@ -52,6 +56,7 @@ All services are available at `https://<name>.lab.chaseconover.com` with automat
 | [DNS Routing](docs/dns-routing.md) | How DNS resolution works (split horizon, Pi-hole, Tailscale) |
 | [TLS](docs/tls.md) | HTTPS setup with Let's Encrypt and Route 53 |
 | [Tailscale](docs/tailscale.md) | Remote access, ACLs, friend onboarding |
+| [Cloudflare Tunnel](docs/cloudflare-tunnel.md) | Public exposure for selected services (Chronicle), security boundaries, ingress configuration |
 | [Bootstrap](docs/bootstrap.md) | First-time host setup guide |
 | [Backup & Restore](docs/backup-restore.md) | Backup strategy and recovery |
 | [Archive](docs/archive.md) | Kiwix ZIM file management |
@@ -63,8 +68,8 @@ All services are available at `https://<name>.lab.chaseconover.com` with automat
 - **Deployment**: Ansible playbooks + Docker Compose
 - **Reverse Proxy**: Caddy with automatic HTTPS (Let's Encrypt via Route 53 DNS challenge)
 - **DNS**: Pi-hole with split horizon (LAN IP locally, Tailscale IP remotely)
-- **Remote Access**: Tailscale with tag-based ACLs
-- **Domain**: `*.lab.chaseconover.com` (CNAME to Tailscale hostname in Route 53)
+- **Remote Access**: Tailscale with tag-based ACLs (`*.lab.*`); Cloudflare Tunnel for selected public services
+- **Domain**: `*.lab.chaseconover.com` (CNAME to Tailscale hostname in Route 53); `journal.chaseconover.com` via Cloudflare DNS + Tunnel
 - **Backups**: Daily tar snapshots via systemd timer
 
 ## Host Layout

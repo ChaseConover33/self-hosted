@@ -1,0 +1,17 @@
+services:
+  chronicle:
+    image: ghcr.io/chaseconover33/chronicle:latest
+    pull_policy: always
+    restart: unless-stopped
+    env_file:
+      - ${PLATFORM_SECRETS_ROOT}/chronicle.env
+    volumes:
+      - ${PLATFORM_DATA_ROOT}/chronicle:/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/sign-in >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3

@@ -17,4 +17,6 @@
     - role: vikunja
     - role: firefly
     - role: gitea
+    - role: chronicle
+    - role: cloudflared
     - role: compose

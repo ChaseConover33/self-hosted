@@ -21,17 +21,24 @@ The platform is split into three active layers:
    - split horizon DNS: returns LAN IP for local queries, Tailscale IP for remote queries
    - runs with host networking to distinguish query source interfaces
    - `local=/lab.chaseconover.com/` prevents upstream forwarding, ensuring offline resilience
+6. `Cloudflare Tunnel`
+   - exposes a small subset of services (e.g. Chronicle) publicly without opening router ports
+   - `cloudflared` makes outbound connections to Cloudflare's edge; Cloudflare proxies inbound traffic over the tunnel
+   - public hostnames are configured in the Cloudflare Zero Trust dashboard and routed to app containers directly (NOT via Caddy)
+   - sits alongside Tailscale, not in place of it; see [cloudflare-tunnel.md](cloudflare-tunnel.md)
 
 `Terraform` is intentionally deferred. The current host already exists, so machine configuration matters more than cloud resource provisioning.
 
 ## Domain
 
-All services are accessible at `https://<name>.lab.chaseconover.com`. DNS is handled by:
+Most services are accessible at `https://<name>.lab.chaseconover.com`. DNS for that zone is handled by:
 
 - **Pi-hole** (local) — answers `*.lab.chaseconover.com` queries from local records, never forwards upstream
 - **Route 53** (remote fallback) — `*.lab.chaseconover.com` CNAME points to the Pi's Tailscale hostname, only reachable on the tailnet
 
 The homelab works with or without internet connectivity because Pi-hole answers locally.
+
+A separate set of hostnames (currently just `journal.chaseconover.com`) are exposed publicly via Cloudflare Tunnel. DNS for those records is managed by Cloudflare, not Route 53. Convention: any host under `*.lab.*` is tailnet-only; anything else is public.
 
 ## Networks
 
@@ -44,7 +51,7 @@ The homelab works with or without internet connectivity because Pi-hole answers 
 - `host` (Pi-hole only)
   - Pi-hole uses host networking for split horizon DNS
 
-No router port forwards or public DNS exposure. Remote access is via Tailscale only.
+No router port forwards. Public exposure is exclusively via Cloudflare Tunnel (outbound from the Pi to Cloudflare's edge), not inbound port forwarding. Remote access for the unrestricted homelab surface is via Tailscale only.
 
 ### WiFi-Only Networking
 

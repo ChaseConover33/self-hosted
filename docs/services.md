@@ -1,6 +1,8 @@
 # Services
 
-All services are accessible at `https://<name>.lab.chaseconover.com` via Caddy reverse proxy with Let's Encrypt TLS certificates (provisioned via Route 53 DNS challenge). See [tls.md](tls.md) for details.
+Most services are accessible at `https://<name>.lab.chaseconover.com` via Caddy reverse proxy with Let's Encrypt TLS certificates (provisioned via Route 53 DNS challenge). See [tls.md](tls.md) for details.
+
+A small subset are also exposed publicly via Cloudflare Tunnel at non-`*.lab.*` hostnames. Convention: `*.lab.chaseconover.com` = tailnet-only, other domains = public. See [cloudflare-tunnel.md](cloudflare-tunnel.md).
 
 ## Baseline (Infrastructure)
 
@@ -97,15 +99,48 @@ All services are accessible at `https://<name>.lab.chaseconover.com` via Caddy r
 - data path: `/mnt/disk1/archive/kiwix` (ZIM files)
 - backup: no (ZIM files are re-downloadable)
 
-### qbittorrent
+### gluetun
 
-- hostname: `torrents.lab.chaseconover.com`
-- purpose: torrent client with web UI for downloading media and books
+- purpose: VPN container that provides the network namespace for the torrent client (kill-switch-enforced — no torrent traffic flows if the VPN drops)
 - RAM profile: low
-- download path: `/mnt/disk1/homelab/uploads/incoming`
-- ports: 6881 TCP/UDP (torrent peer connections)
+- ports: 6881 TCP/UDP (torrent peer), 51413 TCP/UDP (Transmission peer), 9091 (Transmission web UI, proxied by Caddy)
+- backup: config only
+- notes: monitored by the `self-hosted-vpn-healthcheck.timer` systemd unit, which restarts gluetun + Transmission every 5 minutes if the VPN is unhealthy. See [architecture-decisions.md Decision 4](architecture-decisions.md).
+
+### transmission
+
+- hostname: `torrents.lab.chaseconover.com` (proxied by Caddy to `gluetun:9091`)
+- purpose: active torrent client — runs inside gluetun's network namespace via `network_mode: service:gluetun`
+- RAM profile: low
+- download path: `/mnt/disk1/homelab/uploads/incoming` (mapped to `/downloads` inside the container)
 - backup: yes (config only)
-- notes: built-in username/password auth on web UI. Downloads go to the media ingest directory.
+- notes: when adding a torrent via the web UI, set the destination to `/downloads/movies`, `/downloads/shows`, or `/downloads/music` so the ingest script can pick it up. See [Media Ingest](operations.md#media-ingest).
+
+### qbittorrent (disabled)
+
+- purpose: alternative torrent client — compose file is retained but `enabled: false` in `all.yml`
+- notes: swapped out for Transmission due to peer discovery problems behind gluetun. See [architecture-decisions.md Decision 4](architecture-decisions.md).
+
+### chronicle
+
+- hostname: `journal.chaseconover.com` (**public** via Cloudflare Tunnel, not Caddy)
+- purpose: personal journal app — AI-cleaned entries, lens reflections, goal tracking
+- RAM profile: medium
+- exposure: NOT routed through Caddy. `cloudflared` forwards `journal.chaseconover.com` directly to the chronicle container on the `internal` Docker network.
+- auth: Clerk (Phase 1: allowlist of one — owner only). See [Phase 2 multi-user roadmap in the chronicle repo](https://github.com/ChaseConover33/chronicle/blob/main/docs/multi-user-roadmap.md).
+- secret file: `/etc/self-hosted/chronicle.env` (Clerk + Anthropic keys; placeholder generated on first run, fill in manually)
+- data path: `/mnt/disk1/homelab/data/chronicle/chronicle.db` (SQLite + WAL)
+- backup: yes
+- image: `ghcr.io/chaseconover33/chronicle:latest` (built by GitHub Actions on every main push)
+
+### cloudflared
+
+- purpose: Cloudflare Tunnel daemon — outbound-only connection to Cloudflare's edge for public-facing services
+- exposure: no inbound ports, no UI. Public hostname routing is configured in the Cloudflare Zero Trust dashboard, NOT in this repo.
+- RAM profile: low
+- secret file: `/etc/self-hosted/cloudflared.env` (`TUNNEL_TOKEN` from the dashboard)
+- backup: no (token is recreated by re-pasting from the dashboard)
+- security note: dashboard ingress rules MUST point at app containers directly (e.g. `http://chronicle:3000`), never at `caddy:443` — see [cloudflare-tunnel.md](cloudflare-tunnel.md).
 
 ## Tier 2 (Enabled)
 

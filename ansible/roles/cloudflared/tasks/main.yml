@@ -1,0 +1,43 @@
+---
+- name: Check whether cloudflared secret file exists
+  ansible.builtin.stat:
+    path: "{{ platform_secrets_root }}/cloudflared.env"
+  register: cloudflared_secret_file
+  when:
+    - platform_services.cloudflared is defined
+    - platform_services.cloudflared.enabled
+
+- name: Create cloudflared secret file template when missing
+  ansible.builtin.template:
+    src: cloudflared.env.j2
+    dest: "{{ platform_secrets_root }}/cloudflared.env"
+    owner: root
+    group: root
+    mode: "0600"
+    force: false
+  when:
+    - platform_services.cloudflared is defined
+    - platform_services.cloudflared.enabled
+    - not cloudflared_secret_file.stat.exists
+
+- name: Warn when cloudflared secret file still has placeholders
+  ansible.builtin.shell: |
+    grep -q "REPLACE_ME" "{{ platform_secrets_root }}/cloudflared.env" && exit 1 || exit 0
+  register: cloudflared_placeholder_check
+  changed_when: false
+  failed_when: false
+  when:
+    - platform_services.cloudflared is defined
+    - platform_services.cloudflared.enabled
+
+- name: Fail loudly when cloudflared TUNNEL_TOKEN is not yet filled in
+  ansible.builtin.fail:
+    msg: |
+      {{ platform_secrets_root }}/cloudflared.env still contains REPLACE_ME.
+      Create a tunnel in the Cloudflare Zero Trust dashboard
+      (Networks → Tunnels → Create a tunnel → Cloudflared), copy the token,
+      and paste it as TUNNEL_TOKEN in the file, then re-run.
+  when:
+    - platform_services.cloudflared is defined
+    - platform_services.cloudflared.enabled
+    - cloudflared_placeholder_check.rc == 1

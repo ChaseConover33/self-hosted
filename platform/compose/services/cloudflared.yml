@@ -1,0 +1,12 @@
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    env_file:
+      - ${PLATFORM_SECRETS_ROOT}/cloudflared.env
+    networks:
+      - internal
+    depends_on:
+      chronicle:
+        condition: service_started

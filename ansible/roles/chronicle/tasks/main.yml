@@ -1,0 +1,42 @@
+---
+- name: Check whether Chronicle secret file exists
+  ansible.builtin.stat:
+    path: "{{ platform_secrets_root }}/chronicle.env"
+  register: chronicle_secret_file
+  when:
+    - platform_services.chronicle is defined
+    - platform_services.chronicle.enabled
+
+- name: Create Chronicle secret file template when missing
+  ansible.builtin.template:
+    src: chronicle.env.j2
+    dest: "{{ platform_secrets_root }}/chronicle.env"
+    owner: root
+    group: root
+    mode: "0600"
+    force: false
+  when:
+    - platform_services.chronicle is defined
+    - platform_services.chronicle.enabled
+    - not chronicle_secret_file.stat.exists
+
+- name: Warn when Chronicle secret file still has placeholders
+  ansible.builtin.shell: |
+    grep -q "REPLACE_ME" "{{ platform_secrets_root }}/chronicle.env" && exit 1 || exit 0
+  register: chronicle_placeholder_check
+  changed_when: false
+  failed_when: false
+  when:
+    - platform_services.chronicle is defined
+    - platform_services.chronicle.enabled
+
+- name: Fail loudly when Chronicle secrets are not yet filled in
+  ansible.builtin.fail:
+    msg: |
+      {{ platform_secrets_root }}/chronicle.env still contains REPLACE_ME placeholders.
+      Fill in NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY, and ANTHROPIC_API_KEY
+      from the Clerk dashboard (production instance) and Anthropic console, then re-run.
+  when:
+    - platform_services.chronicle is defined
+    - platform_services.chronicle.enabled
+    - chronicle_placeholder_check.rc == 1
