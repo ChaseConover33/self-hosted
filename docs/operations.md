@@ -67,25 +67,64 @@ Create the first Matrix user with:
 sudo /usr/local/bin/self-hosted-register-synapse-user <username> --admin
 ```
 
-## Media Uploads
+## Media Ingest
 
-Use the writable upload landing path:
+New media lands in `/mnt/disk1/homelab/uploads/incoming/{movies,shows,music}` —
+Transmission writes directly into those directories (the path is mounted as
+`/downloads` inside the container). Once downloaded, an ingest script cleans up
+torrent-style names and moves the files into the Jellyfin library at
+`/mnt/disk1/media/{movies,shows,music}`.
 
-- `/srv/self-hosted/uploads/incoming`
+### Flow
 
-That directory is owned by your SSH user, so you can copy files there with `scp` or
-`rsync` without writing directly into the root-owned Jellyfin library folders under
-`/srv/self-hosted/media`.
+1. **Add the torrent** in Transmission at `https://torrents.lab.chaseconover.com`.
+   When the "Open Torrent" dialog appears, set the **Destination folder** to
+   `/downloads/movies`, `/downloads/shows`, or `/downloads/music` depending on the
+   content — this is what tells the ingest script which category to process it as.
+2. **Wait for download to finish**, then SSH to the Pi and run:
+   ```bash
+   ssh chaseconover@chase-raspberrypi.local 'sudo /usr/local/bin/self-hosted-ingest-media'
+   ```
+3. **Jellyfin** scans the library on its next interval and picks up the new titles.
 
-Recommended flow:
+> Transmission runs inside gluetun's network namespace so all its traffic is forced
+> through the VPN — if the tunnel drops, gluetun's kill switch blocks traffic rather
+> than leaking it. See [architecture-decisions.md Decision 4](architecture-decisions.md).
 
-1. Upload into `/srv/self-hosted/uploads/incoming/movies`,
-   `/srv/self-hosted/uploads/incoming/shows`, or
-   `/srv/self-hosted/uploads/incoming/music`.
-2. Run `sudo /usr/local/bin/self-hosted-ingest-media` on the VM, or use
-   [upload-media](/Users/chaseconover/Documents/Code/self-hosted/scripts/upload-media)
-   from your Mac to upload and ingest in one step.
-3. Let Jellyfin scan the organized library folders under `/srv/self-hosted/media`.
+### What the ingest script does
+
+The script lives on the Pi at `/usr/local/bin/self-hosted-ingest-media`. Source of
+truth is the Ansible template at
+[`ansible/roles/media/templates/self-hosted-ingest-media.sh.j2`](/Users/chaseconover/Documents/Code/self-hosted/ansible/roles/media/templates/self-hosted-ingest-media.sh.j2)
+— edit there and redeploy with `./scripts/deploy deploy`; do not edit the deployed
+copy on the Pi.
+
+For each of `movies`, `shows`, and `music` under `incoming/`:
+
+- **Movies** — strips site prefixes (`www.Torrenting.com - ...`) and release tags
+  (`1080p.BluRay.x265-GalaxyRG`), normalizes to `Title (Year)`, removes `sample/`
+  and `extras/` dirs, picks the largest video file as the main feature, and renames
+  it to match the folder.
+- **Shows** — strips the same release-tag junk, normalizes show folder names, and
+  pads season folders (`Season 1` → `Season 01`) so Jellyfin matches them cleanly.
+- **Music** — moved as-is without renaming.
+
+After cleanup, files are `mv`'d into `/mnt/disk1/media/{category}/`. Because the
+upload and media roots live on the same filesystem, `mv` is instant (directory
+entry update only — no byte copy).
+
+### Troubleshooting ingest
+
+- **"No new … media to ingest"** — the `incoming/` subdirectory is empty. Check that
+  the torrent finished and that its destination in Transmission was set to
+  `/downloads/movies`, `/downloads/shows`, or `/downloads/music` (files saved to the
+  default `/downloads/` root are not picked up).
+- **Show/movie doesn't appear in Jellyfin** — trigger a library scan manually in the
+  Jellyfin UI, or check that the cleaned folder name in `/mnt/disk1/media/...`
+  matches Jellyfin's expected `Title (Year)` format. If the name was mangled, fix
+  the cleanup regex in the `.sh.j2` template and redeploy.
+- **Permission errors** — the ingest script must run with `sudo` because Jellyfin's
+  library directories are root-owned.
 
 ## Safe Expansion Order
 

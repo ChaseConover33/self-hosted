@@ -27,7 +27,7 @@ if [[ ! -e "${source_path}" ]]; then
 fi
 
 host="$(ruby -e 'require "yaml"; data = YAML.load_file(ARGV[0]); host = data["all"]["children"]["homelab"]["hosts"].keys.first; details = data["all"]["children"]["homelab"]["hosts"][host]; print "#{details["ansible_user"]}@#{details["ansible_host"]}"' "${inventory_file}")"
-remote_upload_path="/srv/self-hosted/uploads/incoming/${category}/"
+remote_upload_path="/mnt/disk1/homelab/uploads/incoming/${category}/"
 
 rsync -av --progress "${source_path}" "${host}:${remote_upload_path}"
 ssh "${host}" "sudo /usr/local/bin/self-hosted-ingest-media"
