@@ -48,8 +48,8 @@ is actually running. Fix or extend the scripts instead.
 ## 6. No public ingress
 
 The Verizon router does not forward ports, and that is a feature not a limitation.
-Remote access is exclusively via Tailscale. Route 53 holds a CNAME pointing at a
-Tailscale hostname that is only reachable inside the tailnet. Nothing in the
+Remote access is exclusively via Tailscale. Cloudflare DNS holds a (gray-cloud)
+CNAME pointing at a Tailscale hostname that is only reachable inside the tailnet. Nothing in the
 homelab should require opening a public port. New services go behind Caddy on the
 internal Docker network, and Caddy only listens on the LAN + Tailscale interfaces.
 

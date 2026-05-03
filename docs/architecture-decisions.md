@@ -26,7 +26,7 @@ reverse proxy. It runs with Docker `network_mode: host` and is accessed directly
   [`docs/dns-routing.md`](dns-routing.md) for the full strategy comparison and
   [`docs/tailscale.md`](tailscale.md) for how this ties into remote access.
 - **Chicken-and-egg with TLS.** Caddy obtains Let's Encrypt certificates via the
-  Route 53 DNS-01 challenge, which requires working DNS. If Pi-hole were behind Caddy,
+  Cloudflare DNS-01 challenge, which requires working DNS. If Pi-hole were behind Caddy,
   then Caddy would need a valid cert to serve Pi-hole, but Pi-hole would need to be up
   for Caddy (and everything else) to resolve `lab.chaseconover.com` locally. Keeping
   Pi-hole out of the proxy breaks the loop: DNS comes up first, then Caddy requests
@@ -189,22 +189,29 @@ gluetun's network namespace).
 
 ---
 
-## Decision 5: Custom Caddy image with the Route 53 DNS module
+## Decision 5: Custom Caddy image with the Cloudflare DNS module
 
 **What:** Caddy is not run from the stock Docker Hub image. A tiny Dockerfile in
 `platform/compose/caddy/Dockerfile` uses `xcaddy` to build Caddy with
-`github.com/caddy-dns/route53` compiled in, then copies the resulting binary into
+`github.com/caddy-dns/cloudflare` compiled in, then copies the resulting binary into
 `caddy:2-alpine`. The image is built on the Pi during deploy.
+
+The DNS provider was originally `caddy-dns/route53` when the `chaseconover.com`
+zone lived in AWS Route 53. The zone moved to Cloudflare so that Cloudflare Tunnel
+could serve the public hostname `journal.chaseconover.com` (cfargotunnel hostnames
+are not publicly resolvable, so Cloudflare must be authoritative for the parent
+zone in order to issue Universal SSL and route tunnel traffic). The Caddy module
+swap followed the zone move.
 
 **Why:**
 - **Stock Caddy does not include any DNS provider modules.** DNS-01 ACME challenges
   require a provider plugin that can create and delete TXT records in the hosted
-  zone. For AWS Route 53 that plugin is `caddy-dns/route53`, which has to be
+  zone. For Cloudflare that plugin is `caddy-dns/cloudflare`, which has to be
   compiled into the binary at build time.
 - **DNS-01 challenges are the right choice here.** HTTP-01 challenges would require
   exposing port 80 to the public internet. The Verizon CR1000A router cannot
   reliably port-forward and the operator does not want any public ingress anyway.
-  Route 53 DNS-01 only needs AWS API credentials, no inbound ports. See
+  Cloudflare DNS-01 only needs a scoped API token, no inbound ports. See
   [`docs/tls.md`](tls.md) for the full setup.
 
 **Alternatives considered:**
@@ -224,16 +231,17 @@ gluetun's network namespace).
   Dockerfile pins the `caddy:2-builder` and `caddy:2-alpine` base tags — check
   [`docs/docker-image-versioning.md`](docker-image-versioning.md) for the general
   philosophy on image pinning after the Pi-hole v6 incident.
-- AWS credentials (`/etc/self-hosted/caddy.env`) are a hard dependency. Losing them
-  means no cert renewals.
+- The Cloudflare API token (`/etc/self-hosted/caddy.env`) is a hard dependency.
+  Losing it means no cert renewals.
 
 ---
 
 ## Decision 6: Tailscale for remote access, not port forwarding
 
 **What:** Remote access to the homelab goes through a Tailscale tailnet. The Pi runs
-`tailscaled` with `--advertise-tags=tag:homelab`. A wildcard CNAME in Route 53 points
-`*.lab.chaseconover.com` at the Pi's Tailscale hostname. Access for friends is
+`tailscaled` with `--advertise-tags=tag:homelab`. A wildcard CNAME in Cloudflare DNS
+points `*.lab.chaseconover.com` at the Pi's Tailscale hostname (gray cloud, DNS only —
+Cloudflare cannot proxy traffic to a Tailscale hostname). Access for friends is
 controlled by Tailscale ACLs.
 
 **Why:**

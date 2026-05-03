@@ -11,9 +11,9 @@ The platform is split into three active layers:
    - defines the running container stack
    - keeps services portable across any Debian host with Docker
 3. `Caddy`
-   - serves HTTPS with Let's Encrypt certificates (via Route 53 DNS challenge)
+   - serves HTTPS with Let's Encrypt certificates (via Cloudflare DNS challenge)
    - routes browser traffic to enabled services by hostname
-   - custom image with `caddy-dns/route53` module
+   - custom image with `caddy-dns/cloudflare` module
 4. `Tailscale`
    - provides secure remote access via encrypted mesh network
    - ACLs restrict friends to web-only access (ports 80, 443, 53, 2222)
@@ -34,11 +34,11 @@ The platform is split into three active layers:
 Most services are accessible at `https://<name>.lab.chaseconover.com`. DNS for that zone is handled by:
 
 - **Pi-hole** (local) — answers `*.lab.chaseconover.com` queries from local records, never forwards upstream
-- **Route 53** (remote fallback) — `*.lab.chaseconover.com` CNAME points to the Pi's Tailscale hostname, only reachable on the tailnet
+- **Cloudflare DNS** (remote fallback) — `*.lab.chaseconover.com` CNAME points to the Pi's Tailscale hostname, only reachable on the tailnet
 
 The homelab works with or without internet connectivity because Pi-hole answers locally.
 
-A separate set of hostnames (currently just `journal.chaseconover.com`) are exposed publicly via Cloudflare Tunnel. DNS for those records is managed by Cloudflare, not Route 53. Convention: any host under `*.lab.*` is tailnet-only; anything else is public.
+A separate set of hostnames (currently just `journal.chaseconover.com`) are exposed publicly via Cloudflare Tunnel. The same Cloudflare zone serves both — Convention: any host under `*.lab.*` is tailnet-only (gray-cloud / DNS only); anything else is proxied through the tunnel.
 
 ## Networks
 

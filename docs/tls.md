@@ -1,86 +1,67 @@
-# HTTPS with Let's Encrypt and Route 53
+# HTTPS with Let's Encrypt and Cloudflare DNS
 
-Caddy serves all homelab services over HTTPS using Let's Encrypt certificates, provisioned via DNS challenge with AWS Route 53.
+Caddy serves all homelab services over HTTPS using Let's Encrypt certificates, provisioned via DNS challenge with Cloudflare DNS.
 
 ## How It Works
 
 1. Caddy requests a TLS certificate from Let's Encrypt for `*.lab.chaseconover.com`
 2. Let's Encrypt asks Caddy to prove domain ownership via a DNS TXT record
-3. Caddy uses the Route 53 API to create the TXT record automatically
+3. Caddy uses the Cloudflare API to create the TXT record automatically
 4. Let's Encrypt verifies and issues the certificate
 5. Caddy deletes the TXT record and serves HTTPS
 
-No ports are exposed to the internet. The DNS challenge only requires API access to Route 53, not inbound HTTP.
+No ports are exposed to the internet. The DNS challenge only requires API access to Cloudflare, not inbound HTTP.
 
-## Route 53 Setup
+## Cloudflare Setup
 
 ### 1. Add a wildcard CNAME record
 
-In the AWS Route 53 console, add this record to your hosted zone for `chaseconover.com`:
+In the Cloudflare DNS dashboard for `chaseconover.com`, add this record:
 
-| Name | Type | Value |
-|------|------|-------|
-| `*.lab.chaseconover.com` | CNAME | `chase-raspberrypi.<your-tailnet>.ts.net` |
+| Name | Type | Value | Proxy |
+|------|------|-------|-------|
+| `*.lab` | CNAME | `chase-raspberrypi.<your-tailnet>.ts.net` | DNS only (gray cloud) |
 
-This points all `*.lab.chaseconover.com` subdomains to the Pi's Tailscale hostname. Only devices on the tailnet can reach it.
+The full hostname is `*.lab.chaseconover.com`. **Proxy must be off (gray cloud)** — Cloudflare cannot proxy traffic to a Tailscale hostname; this record is publicly resolvable but only reachable from inside the tailnet.
 
-### 2. Create an IAM policy
+### 2. Create a scoped API token
 
-Create an IAM policy with minimal Route 53 permissions:
+In Cloudflare → My Profile → API Tokens → **Create Token**:
 
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "route53:ListHostedZones",
-        "route53:GetChange"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "route53:ChangeResourceRecordSets",
-        "route53:ListResourceRecordSets"
-      ],
-      "Resource": "arn:aws:route53:::hostedzone/<YOUR_HOSTED_ZONE_ID>"
-    }
-  ]
-}
-```
+- Use the **Edit zone DNS** template
+- **Permissions:** `Zone — DNS — Edit`
+- **Zone Resources:** `Include — Specific zone — chaseconover.com`
+- (Leave IP filter and TTL unset, or scope as you prefer)
 
-### 3. Create an IAM user
+Copy the token. It is shown only once.
 
-1. Create an IAM user (e.g., `homelab-caddy`)
-2. Attach the policy from step 2
-3. Generate access keys
-
-### 4. Create the Caddy secrets file on the Pi
+### 3. Create the Caddy secrets file on the Pi
 
 SSH into the Pi and create `/etc/self-hosted/caddy.env`:
 
 ```bash
 sudo tee /etc/self-hosted/caddy.env > /dev/null << 'EOF'
-AWS_ACCESS_KEY_ID=<your-access-key>
-AWS_SECRET_ACCESS_KEY=<your-secret-key>
-AWS_HOSTED_ZONE_ID=<your-hosted-zone-id>
-AWS_REGION=us-east-1
+CLOUDFLARE_API_TOKEN=<your-token>
 EOF
 sudo chmod 600 /etc/self-hosted/caddy.env
 ```
 
-Find your hosted zone ID in the Route 53 console under "Hosted zones".
-
-### 5. Deploy
+### 4. Deploy
 
 ```bash
 ./scripts/deploy deploy
 ```
 
-The first deploy will build a custom Caddy image (includes the Route 53 DNS module) and provision certificates. This takes a few minutes on the Pi.
+The first deploy will build a custom Caddy image (includes the Cloudflare DNS module) and provision certificates. This takes a few minutes on the Pi.
+
+If you are migrating from a previous DNS provider (e.g. Route 53), the existing Caddy image was built with a different DNS module and must be rebuilt:
+
+```bash
+ssh chaseconover@192.168.1.167 \
+  'cd /srv/self-hosted/compose && \
+   sudo docker compose --project-name homelab build caddy && \
+   sudo docker compose --project-name homelab up -d caddy'
+```
 
 ## Pi-hole DNS (Split Horizon)
 
@@ -94,7 +75,7 @@ This is configured automatically by Ansible via dual `address=` entries in the d
 
 ## Custom Caddy Image
 
-The standard Caddy image doesn't include DNS provider modules. A custom image is built from `platform/compose/caddy/Dockerfile` using `xcaddy` to include the `caddy-dns/route53` module. The image is built on the Pi during the first deploy and cached for subsequent deploys.
+The standard Caddy image doesn't include DNS provider modules. A custom image is built from `platform/compose/caddy/Dockerfile` using `xcaddy` to include the `caddy-dns/cloudflare` module. The image is built on the Pi during the first deploy and cached for subsequent deploys.
 
 ## Certificate Renewal
 

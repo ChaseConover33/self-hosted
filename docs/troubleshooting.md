@@ -52,7 +52,7 @@ Pi-hole uses `local=/lab.chaseconover.com/` to answer all homelab queries from l
 
 ## HTTPS Certificate Issues
 
-Caddy provisions Let's Encrypt certificates automatically via Route 53 DNS challenge. If you see TLS errors:
+Caddy provisions Let's Encrypt certificates automatically via Cloudflare DNS challenge. If you see TLS errors:
 
 ### Certs not yet provisioned (new setup or after cert wipe)
 
@@ -81,13 +81,13 @@ sudo docker exec homelab-caddy-1 ls /data/caddy/certificates/acme-v02.api.letsen
 
 Each service should have a directory. If a service is missing, Caddy is still provisioning it.
 
-### AWS credentials issue
+### Cloudflare API token issue
 
-If Caddy logs show `IncompleteSignature` or `AccessDenied`, check `/etc/self-hosted/caddy.env`:
+If Caddy logs show `Authentication error` or `Invalid request headers`, check `/etc/self-hosted/caddy.env`:
 - No trailing whitespace on any line
-- No quotes around values
-- `AWS_HOSTED_ZONE_ID` matches your Route 53 hosted zone
-- IAM user has `route53:ListHostedZones`, `route53:ListHostedZonesByName`, `route53:GetChange`, `route53:ChangeResourceRecordSets`, and `route53:ListResourceRecordSets` permissions
+- No quotes around the token value
+- `CLOUDFLARE_API_TOKEN` is the only required variable
+- Token has `Zone:DNS:Edit` permission on the `chaseconover.com` zone (Cloudflare → My Profile → API Tokens)
 
 After fixing, the Caddy container must be **recreated** (not just restarted) to pick up env file changes. Run `./scripts/deploy compose`.
 

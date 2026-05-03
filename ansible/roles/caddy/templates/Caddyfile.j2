@@ -16,10 +16,10 @@
                 "challenges": {
                   "dns": {
                     "provider": {
-                      "name": "route53",
-                      "max_retries": 10
+                      "name": "cloudflare",
+                      "api_token": "{env.CLOUDFLARE_API_TOKEN}"
                     },
-                    "propagation_delay": "60s",
+                    "propagation_delay": "30s",
                     "propagation_timeout": "300s"
                   }
                 }

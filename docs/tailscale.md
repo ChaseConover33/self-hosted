@@ -50,7 +50,7 @@ This is achieved by:
 1. **Pi-hole runs with host networking** — so it can see which interface (LAN vs Tailscale) the DNS query arrived on
 2. **Dual DNS records** — Ansible generates two `address=` entries per hostname (one LAN IP, one Tailscale IP)
 3. **dnsmasq `localise-queries`** — automatically returns the IP matching the query's source subnet
-4. **dnsmasq `local=/lab.chaseconover.com/`** — prevents Pi-hole from forwarding queries upstream to Route 53, which would return the CNAME and override local records. This also ensures the homelab works during internet outages.
+4. **dnsmasq `local=/lab.chaseconover.com/`** — prevents Pi-hole from forwarding queries upstream to Cloudflare DNS, which would return the CNAME and override local records. This also ensures the homelab works during internet outages.
 
 No subnet routing is needed. All traffic from remote devices goes directly to the Pi's Tailscale IP through the encrypted tunnel.
 

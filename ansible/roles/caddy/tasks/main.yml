@@ -18,7 +18,7 @@
       - caddy_secret_file.stat.exists
     fail_msg: >-
       Missing {{ platform_secrets_root }}/caddy.env — create it with
-      AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_HOSTED_ZONE_ID, and AWS_REGION.
+      CLOUDFLARE_API_TOKEN (token must have Zone:DNS:Edit on the zone).
       See docs/tls.md for details.
 
 - name: Render Caddy config

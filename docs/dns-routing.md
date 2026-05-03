@@ -158,9 +158,9 @@ flowchart TD
 
     PIHOLE["Pi-hole (host networking)\n\nlocal=/lab.chaseconover.com/\nlocalise-queries\n\nLAN queries → 192.168.1.167\nTailscale queries → 100.x.y.z"]
 
-    CADDY["Caddy (HTTPS)\nLet's Encrypt certs\nvia Route 53 DNS challenge"]
+    CADDY["Caddy (HTTPS)\nLet's Encrypt certs\nvia Cloudflare DNS challenge"]
 
-    ROUTE53["Route 53\n*.lab.chaseconover.com\nCNAME → Pi's Tailscale hostname"]
+    CFDNS["Cloudflare DNS\n*.lab.chaseconover.com\nCNAME → Pi's Tailscale hostname\n(gray cloud, DNS only)"]
 
     MAC -->|"DNS query on eth0"| PIHOLE
     PIHOLE -->|"returns 192.168.1.167\n(LAN IP)"| MAC
@@ -179,8 +179,8 @@ flowchart TD
 1. Pi-hole runs with **host networking** so it can see whether a DNS query arrived on `eth0` (LAN) or `tailscale0` (Tailscale)
 2. Each hostname has **two `address=` records** in dnsmasq — one LAN IP, one Tailscale IP
 3. The `localise-queries` directive returns the IP matching the query's source subnet
-4. The `local=/lab.chaseconover.com/` directive prevents Pi-hole from forwarding queries upstream to Route 53 (which would return the CNAME and override local records)
-5. Caddy serves all requests over **HTTPS** with Let's Encrypt certificates provisioned via Route 53 DNS challenge
+4. The `local=/lab.chaseconover.com/` directive prevents Pi-hole from forwarding queries upstream to Cloudflare DNS (which would return the CNAME and override local records)
+5. Caddy serves all requests over **HTTPS** with Let's Encrypt certificates provisioned via Cloudflare DNS challenge
 
 **DNS resolution by scenario:**
 
@@ -189,7 +189,7 @@ flowchart TD
 | Home LAN | Pi-hole | eth0 | 192.168.1.167 | Direct |
 | Home LAN, internet down | Pi-hole | eth0 | 192.168.1.167 | Direct (still works) |
 | Remote via Tailscale | Pi-hole | tailscale0 | 100.x.y.z | Encrypted tunnel |
-| Not on tailnet | Route 53 | N/A | Tailscale hostname (unreachable) | Blocked |
+| Not on tailnet | Cloudflare DNS | N/A | Tailscale hostname (unreachable) | Blocked |
 
 **Key dnsmasq config files:**
 
@@ -198,11 +198,11 @@ flowchart TD
 
 ---
 
-## Public services (separate zone, separate DNS provider)
+## Public services (same zone, different routing)
 
-The split-horizon scheme above only applies to `*.lab.chaseconover.com` — the tailnet-only hostnames. A small number of services are also exposed publicly via Cloudflare Tunnel at non-`*.lab.*` hostnames (currently just `journal.chaseconover.com`). DNS for those records is managed in **Cloudflare DNS**, not Route 53 or Pi-hole.
+The split-horizon scheme above only applies to `*.lab.chaseconover.com` — the tailnet-only hostnames. A small number of services are also exposed publicly via Cloudflare Tunnel at non-`*.lab.*` hostnames (currently just `journal.chaseconover.com`). All records live in the same Cloudflare zone — `*.lab.*` records are gray-cloud (DNS only, tailnet-routed), and tunnel hostnames are auto-managed proxied records created by the Zero Trust dashboard.
 
-**Why a different provider:** Cloudflare Tunnel auto-provisions a CNAME-style record on the Cloudflare side when you add a public hostname in the Zero Trust dashboard. That requires Cloudflare to be authoritative for the zone (or for you to manually create a CNAME pointing to `<tunnel-id>.cfargotunnel.com` in your existing DNS provider). For the bare `chaseconover.com` apex and the `journal.` subdomain it's simplest to delegate that zone to Cloudflare.
+**Why Cloudflare must be authoritative for the zone:** Cloudflare Tunnel auto-provisions a proxied DNS record + Universal SSL cert when you add a public hostname in the Zero Trust dashboard. This only works when Cloudflare is authoritative for the parent zone — `<tunnel-id>.cfargotunnel.com` hostnames are not directly resolvable by external DNS resolvers (they synthesize public IPs only inside Cloudflare's resolution path). A plain CNAME from an external DNS provider to `cfargotunnel.com` will fail TLS handshakes (no cert) and likely fail DNS resolution entirely. For this reason the `chaseconover.com` zone is delegated to Cloudflare in full; Route 53 is no longer used.
 
 **Resolution flow for public hosts:**
 

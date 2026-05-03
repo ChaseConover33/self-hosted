@@ -1,6 +1,6 @@
 # Services
 
-Most services are accessible at `https://<name>.lab.chaseconover.com` via Caddy reverse proxy with Let's Encrypt TLS certificates (provisioned via Route 53 DNS challenge). See [tls.md](tls.md) for details.
+Most services are accessible at `https://<name>.lab.chaseconover.com` via Caddy reverse proxy with Let's Encrypt TLS certificates (provisioned via Cloudflare DNS challenge). See [tls.md](tls.md) for details.
 
 A small subset are also exposed publicly via Cloudflare Tunnel at non-`*.lab.*` hostnames. Convention: `*.lab.chaseconover.com` = tailnet-only, other domains = public. See [cloudflare-tunnel.md](cloudflare-tunnel.md).
 
@@ -10,7 +10,7 @@ A small subset are also exposed publicly via Cloudflare Tunnel at non-`*.lab.*` 
 
 - purpose: HTTPS reverse proxy with automatic Let's Encrypt certificates
 - exposure: published on LAN ports `80` (redirects to HTTPS) and `443`
-- custom image: built with `caddy-dns/route53` module for DNS challenge
+- custom image: built with `caddy-dns/cloudflare` module for DNS challenge
 - RAM profile: low
 - backup: config only
 

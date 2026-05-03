@@ -47,7 +47,7 @@ The current ingress map should contain exactly:
 
 ## Setting up the tunnel (one-time)
 
-1. Sign up / log in to Cloudflare. Add the `chaseconover.com` domain (or relevant zone) to Cloudflare DNS, OR keep it in Route 53 and use a CNAME for the tunnel record.
+1. Sign up / log in to Cloudflare. Add the `chaseconover.com` domain to Cloudflare DNS and delegate the zone (change nameservers at the registrar). Cloudflare must be authoritative for the parent zone — `cfargotunnel.com` hostnames are not resolvable by external DNS, so a manual CNAME from another DNS provider does not work.
 2. Go to https://one.dash.cloudflare.com/ → **Networks → Tunnels** → **Create a tunnel** → **Cloudflared**. Name it (e.g. `homelab`).
 3. The next screen shows an install command containing the tunnel token. Copy the token.
 4. On the Pi, write the token to the secret file (the Ansible role creates a placeholder file on first run):
